@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { EventWithDetails } from '@/services/eventService';
 import { getPersonalCalendarEventsForUser, PersonalCalendarEvent } from '@/services/personalCalendarService';
 import { Contact } from '@/lib/supabase';
-import { FAMILY_EVENT_COLOR, getEventColor, formatDisplayName, normalizeColorForDisplay, blendColors } from '@/utils/colorUtils';
+import { FAMILY_EVENT_COLOR, getEventColor, formatDisplayName, blendColors } from '@/utils/colorUtils';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { useSelectedDate } from '@/contexts/SelectedDateContext';

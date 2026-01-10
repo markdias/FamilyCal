@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 2,
         bottom: 2,
-        left: 2,
+        left: 0,
         borderRadius: 6,
         shadowColor: '#000',
         shadowOffset: {
@@ -120,6 +120,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.15,
         shadowRadius: 2,
         elevation: 2,
+        transform: [{ rotate: '360deg' }, { scaleX: -1 }],
     },
     option: {
         flex: 1,

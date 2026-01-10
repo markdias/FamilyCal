@@ -2,16 +2,16 @@ import { getCacheKeysForEventDate, useEventCache } from '@/contexts/EventCacheCo
 import { useFamily } from '@/contexts/FamilyContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import {
-    createEvent,
-    deleteEvent,
-    EventWithDetails,
-    getEvent,
-    getEventRemindersForUser,
-    RecurrenceInput,
-    ReminderInput,
-    updateEvent,
-    updateEventParticipants,
-    upsertEventReminders,
+  createEvent,
+  deleteEvent,
+  EventWithDetails,
+  getEvent,
+  getEventRemindersForUser,
+  RecurrenceInput,
+  ReminderInput,
+  updateEvent,
+  updateEventParticipants,
+  upsertEventReminders,
 } from '@/services/eventService';
 import { trackLocationUsage } from '@/services/recentLocationsService';
 import { formatDisplayName } from '@/utils/colorUtils';
@@ -21,16 +21,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LocationPicker } from './LocationPicker';
@@ -51,7 +51,7 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
   const backgroundColor = useThemeColor({}, 'background');
   const cardColor = useThemeColor({ light: '#FFFFFF', dark: '#1E1E1E' }, 'background');
   const surfaceColor = useThemeColor({ light: '#F5F5F7', dark: '#2C2C2E' }, 'background');
-  const borderColor = useThemeColor({ light: '#E5E5EA', dark: '#3A3A3C' }, 'border');
+  const borderColor = useThemeColor({ light: '#E5E5EA', dark: '#3A3A3C' }, 'text'); // Changed from 'border' to 'text' to match theme options
   const textColor = useThemeColor({}, 'text');
   const mutedText = useThemeColor({ light: '#8E8E93', dark: '#9EA0A6' }, 'text');
   const accent = useThemeColor({ light: '#007AFF', dark: '#0A84FF' }, 'tint');
@@ -93,9 +93,7 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
   const [showRecurrenceEndDatePicker, setShowRecurrenceEndDatePicker] = useState(false);
 
   // Picker state (mirror AddEvent "Done" UX)
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [currentPickerField, setCurrentPickerField] = useState<'start' | 'end'>('start');
+  const [activePicker, setActivePicker] = useState<'startDate' | 'startTime' | 'endDate' | 'endTime' | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -142,12 +140,12 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
             setNotes(data.notes || '');
             setUrl(data.url || '');
             setIsAllDay(data.is_all_day);
-            
+
             // Use occurrence if provided, otherwise the event's base start/end
             const baseStart = new Date(data.start_time);
             const baseEnd = new Date(data.end_time);
             const durationMs = baseEnd.getTime() - baseStart.getTime();
-            
+
             if (occurrence) {
               const occStart = new Date(occurrence);
               setStartDate(occStart);
@@ -177,7 +175,7 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
             });
             if (data.recurrence_end_date) setRecurrenceEndMode('onDate');
             if (data.recurrence_count) setRecurrenceEndMode('afterCount');
-            
+
             // Set selected members from participants
             const participantIds = data.participants?.map(p => p.contact_id) || [];
             setSelectedMembers(participantIds);
@@ -326,7 +324,7 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
 
   const handleDateChange = (_event: any, selectedDate?: Date) => {
     if (!selectedDate) return;
-    if (currentPickerField === 'start') {
+    if (activePicker === 'startDate') {
       const newStartDate = new Date(selectedDate);
       newStartDate.setHours(startDate.getHours(), startDate.getMinutes());
       setStartDate(newStartDate);
@@ -335,7 +333,7 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
         newEndDate.setHours(newStartDate.getHours() + 1);
         setEndDate(newEndDate);
       }
-    } else {
+    } else if (activePicker === 'endDate') {
       const newEndDate = new Date(selectedDate);
       newEndDate.setHours(endDate.getHours(), endDate.getMinutes());
       setEndDate(newEndDate);
@@ -344,7 +342,7 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
 
   const handleTimeChange = (_event: any, selectedTime?: Date) => {
     if (!selectedTime) return;
-    if (currentPickerField === 'start') {
+    if (activePicker === 'startTime') {
       const newStartDate = new Date(startDate);
       newStartDate.setHours(selectedTime.getHours(), selectedTime.getMinutes());
       setStartDate(newStartDate);
@@ -353,22 +351,19 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
         newEndDate.setHours(newStartDate.getHours() + 1);
         setEndDate(newEndDate);
       }
-    } else {
+    } else if (activePicker === 'endTime') {
       const newEndDate = new Date(endDate);
       newEndDate.setHours(selectedTime.getHours(), selectedTime.getMinutes());
       setEndDate(newEndDate);
     }
   };
 
-  const showPicker = (mode: 'date' | 'time', field: 'start' | 'end') => {
-    setCurrentPickerField(field);
-    if (mode === 'date') {
-      setShowDatePicker(true);
-      setShowTimePicker(false);
-    } else {
-      setShowTimePicker(true);
-      setShowDatePicker(false);
-    }
+  const showPicker = (picker: 'startDate' | 'startTime' | 'endDate' | 'endTime') => {
+    setActivePicker(picker);
+  };
+
+  const closePicker = () => {
+    setActivePicker(null);
   };
 
   const showError = (message: string) => {
@@ -419,8 +414,8 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
       endDate: endDateOverride
         ? endDateOverride
         : event.recurrence_end_date
-        ? new Date(event.recurrence_end_date)
-        : undefined,
+          ? new Date(event.recurrence_end_date)
+          : undefined,
       weekStart: event.recurrence_week_start || 'MO',
     };
   };
@@ -447,21 +442,26 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
 
   const saveAllOccurrences = async () => {
     const recurrencePayload = buildRecurrencePayload();
+    const address = location?.address || undefined;
+    const titleVal = location?.title || undefined;
+    const lat = location?.latitude ?? undefined;
+    const lon = location?.longitude ?? undefined;
+
     const { error: updateError } = await updateEvent(eventId, {
       title: title.trim(),
-      location: location?.address || undefined,
-      structuredLocationTitle: location?.title || undefined,
-      structuredLocationAddress: location?.address || undefined,
-      structuredLocationLatitude: location?.latitude,
-      structuredLocationLongitude: location?.longitude,
+      location: address,
+      structuredLocationTitle: titleVal,
+      structuredLocationAddress: address,
+      structuredLocationLatitude: lat,
+      structuredLocationLongitude: lon,
       notes: notes.trim() || undefined,
-      url: url.trim() || null,
+      url: url.trim() || undefined,
       startTime: startDate,
       endTime: endDate,
       isAllDay,
       availability,
-      travelTimeMinutes,
-      dropOffDriverId: selectedDriverId,
+      travelTimeMinutes: travelTimeMinutes ?? undefined,
+      dropOffDriverId: selectedDriverId ?? undefined,
       recurrence: recurrencePayload,
     });
     if (updateError) throw updateError;
@@ -513,18 +513,22 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
         title: title.trim(),
         description: event.description || undefined,
         notes: notes.trim() || undefined,
-        location: location.trim() || undefined,
+        location: location?.address || undefined,
+        structuredLocationTitle: location?.title || undefined,
+        structuredLocationAddress: location?.address || undefined,
+        structuredLocationLatitude: location?.latitude ?? undefined,
+        structuredLocationLongitude: location?.longitude ?? undefined,
         url: url.trim() || undefined,
         startTime: occurrenceStart,
         endTime: endDate,
         isAllDay,
         categoryId: event.category_id || undefined,
         availability,
-        travelTimeMinutes,
+        travelTimeMinutes: travelTimeMinutes ?? undefined,
         isRecurring: recurrencePayload.isRecurring,
         recurrence: recurrencePayload,
-        dropOffDriverId: selectedDriverId,
-        collectionDriverId: event.collection_driver_id || null,
+        dropOffDriverId: selectedDriverId ?? undefined,
+        collectionDriverId: event.collection_driver_id ?? undefined,
         sameDriver: event.same_driver || false,
       },
       selectedMembers
@@ -569,19 +573,19 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
         location: event.structured_location_address || event.location || undefined,
         structuredLocationTitle: event.structured_location_title || undefined,
         structuredLocationAddress: event.structured_location_address || undefined,
-        structuredLocationLatitude: event.structured_location_latitude,
-        structuredLocationLongitude: event.structured_location_longitude,
+        structuredLocationLatitude: event.structured_location_latitude ?? undefined,
+        structuredLocationLongitude: event.structured_location_longitude ?? undefined,
         url: event.url || undefined,
         startTime: nextStart,
         endTime: new Date(nextStart.getTime() + (new Date(event.end_time).getTime() - new Date(event.start_time).getTime())),
         isAllDay: event.is_all_day,
         categoryId: event.category_id || undefined,
-        availability: event.availability,
-        travelTimeMinutes: event.travel_time || null,
+        availability: event.availability as any,
+        travelTimeMinutes: event.travel_time ?? undefined,
         isRecurring: true,
         recurrence: buildRecurrenceFromExisting(),
-        dropOffDriverId: event.drop_off_driver_id || null,
-        collectionDriverId: event.collection_driver_id || null,
+        dropOffDriverId: event.drop_off_driver_id ?? undefined,
+        collectionDriverId: event.collection_driver_id ?? undefined,
         sameDriver: event.same_driver || false,
       },
       event.participants?.map((p) => p.contact_id) || []
@@ -598,19 +602,19 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
         location: location?.address || undefined,
         structuredLocationTitle: location?.title || undefined,
         structuredLocationAddress: location?.address || undefined,
-        structuredLocationLatitude: location?.latitude,
-        structuredLocationLongitude: location?.longitude,
+        structuredLocationLatitude: location?.latitude ?? undefined,
+        structuredLocationLongitude: location?.longitude ?? undefined,
         url: url.trim() || undefined,
         startTime: occurrenceStart,
         endTime: new Date(occurrenceStart.getTime() + durationMs),
         isAllDay,
         categoryId: event.category_id || undefined,
         availability,
-        travelTimeMinutes,
+        travelTimeMinutes: travelTimeMinutes ?? undefined,
         isRecurring: false,
         recurrence: { isRecurring: false },
-        dropOffDriverId: selectedDriverId,
-        collectionDriverId: event.collection_driver_id || null,
+        dropOffDriverId: selectedDriverId ?? undefined,
+        collectionDriverId: event.collection_driver_id ?? undefined,
         sameDriver: event.same_driver || false,
       },
       selectedMembers
@@ -751,15 +755,15 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
         showError('Failed to delete event');
         return;
       }
-      
+
       // Invalidate cache for event date
       if (event) {
         const eventDate = new Date(event.start_time);
         const keysToInvalidate = getCacheKeysForEventDate(eventDate);
         eventCache.invalidateCache(keysToInvalidate);
       }
-      
-      router.replace('/(tabs)/');
+
+      router.replace('/');
     } catch (err) {
       showError('Failed to delete event');
     } finally {
@@ -777,15 +781,15 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
         recurrence: buildRecurrenceFromExisting(cutoff),
       });
       if (error) throw error;
-      
+
       // Invalidate cache for event date
       if (event) {
         const eventDate = new Date(event.start_time);
         const keysToInvalidate = getCacheKeysForEventDate(eventDate);
         eventCache.invalidateCache(keysToInvalidate);
       }
-      
-      router.replace('/(tabs)/');
+
+      router.replace('/');
     } catch (err) {
       showError('Failed to delete future occurrences');
     } finally {
@@ -799,6 +803,7 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
     setIsDeleting(true);
     try {
       const cutoff = new Date(occurrenceStart.getTime() - 1000);
+
       // End original before occurrence
       const { error: endError } = await updateEvent(event.id, {
         recurrence: buildRecurrenceFromExisting(cutoff),
@@ -806,32 +811,65 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
       if (endError) throw endError;
 
       // Create future series to preserve later occurrences
-      const nextStart = getNextStart(occurrenceStart, event.recurrence_frequency as any, event.recurrence_interval);
-      const durationMs =
-        new Date(event.end_time).getTime() - new Date(event.start_time).getTime();
-      const { error: futureError } = await createEvent(
+      const nextStart = getNextStart(occurrenceStart, event.recurrence_frequency as any, event.recurrence_interval || 1);
+      const durationMs = new Date(event.end_time).getTime() - new Date(event.start_time).getTime();
+
+      const { data: futureEvent, error: futureError } = await createEvent(
         currentFamily.id,
         {
           title: event.title,
           description: event.description || undefined,
           notes: event.notes || undefined,
-          location: event.location || undefined,
+          location: event.structured_location_address || event.location || undefined,
+          structuredLocationTitle: event.structured_location_title || undefined,
+          structuredLocationAddress: event.structured_location_address || undefined,
+          structuredLocationLatitude: event.structured_location_latitude ?? undefined,
+          structuredLocationLongitude: event.structured_location_longitude ?? undefined,
           url: event.url || undefined,
           startTime: nextStart,
-          endTime: new Date(nextStart.getTime() + durationMs),
+          endTime: new Date(nextStart.getTime() + (new Date(event.end_time).getTime() - new Date(event.start_time).getTime())),
           isAllDay: event.is_all_day,
           categoryId: event.category_id || undefined,
-          availability: event.availability,
-          travelTimeMinutes: event.travel_time || null,
+          availability: event.availability as any,
+          travelTimeMinutes: event.travel_time ?? undefined,
           isRecurring: true,
           recurrence: buildRecurrenceFromExisting(),
-          dropOffDriverId: event.drop_off_driver_id || null,
-          collectionDriverId: event.collection_driver_id || null,
+          dropOffDriverId: event.drop_off_driver_id ?? undefined,
+          collectionDriverId: event.collection_driver_id ?? undefined,
           sameDriver: event.same_driver || false,
         },
         event.participants?.map((p) => p.contact_id) || []
       );
       if (futureError) throw futureError;
+
+      // Create standalone edited occurrence
+      const { data: singleEvent, error: createError } = await createEvent(
+        currentFamily.id,
+        {
+          title: title.trim(),
+          description: event.description || undefined,
+          notes: notes.trim() || undefined,
+          location: location?.address || undefined,
+          structuredLocationTitle: location?.title || undefined,
+          structuredLocationAddress: location?.address || undefined,
+          structuredLocationLatitude: location?.latitude ?? undefined,
+          structuredLocationLongitude: location?.longitude ?? undefined,
+          url: url.trim() || undefined,
+          startTime: occurrenceStart,
+          endTime: new Date(occurrenceStart.getTime() + durationMs),
+          isAllDay,
+          categoryId: event.category_id || undefined,
+          availability,
+          travelTimeMinutes: travelTimeMinutes ?? undefined,
+          isRecurring: false,
+          recurrence: { isRecurring: false },
+          dropOffDriverId: selectedDriverId ?? undefined,
+          collectionDriverId: event.collection_driver_id ?? undefined,
+          sameDriver: event.same_driver || false,
+        },
+        selectedMembers
+      );
+      if (createError) throw createError;
 
       // Invalidate cache for event date
       if (event) {
@@ -840,7 +878,7 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
         eventCache.invalidateCache(keysToInvalidate);
       }
 
-      router.replace('/(tabs)/');
+      router.replace('/');
     } catch (err) {
       showError('Failed to delete this occurrence');
     } finally {
@@ -912,12 +950,12 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
   // Get participant names for display
   const getParticipantNames = () => {
     if (selectedMembers.length === 0) return 'None';
-    
+
     const names = selectedMembers.map(id => {
       const contact = contacts.find(c => c.id === id);
       return contact ? formatDisplayName(contact.first_name, contact.last_name, currentFamily?.name) : '';
     }).filter(Boolean);
-    
+
     return names.join(', ') || 'None';
   };
 
@@ -943,7 +981,7 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
   }
 
   return (
-    <View style={[styles.container, { backgroundColor }]}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 0), backgroundColor }]}>
       <ScrollView
         style={[styles.scrollView, { backgroundColor }]}
         contentContainerStyle={[
@@ -953,142 +991,228 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
         {/* Event Details Card */}
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+        <View style={[styles.card, { backgroundColor: cardColor }]}>
           <View style={[styles.fieldRow, styles.titleRow]}>
-            <Ionicons name="menu" size={20} color={mutedText} />
-            <View style={styles.fieldContent}>
+            <View style={styles.iconColumn}>
+              <Ionicons name="menu" size={20} color={mutedText} />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Title</Text>
             </View>
+            <TextInput
+              style={[styles.titleInput, { color: textColor, backgroundColor: surfaceColor }]}
+              placeholder="Event Title"
+              placeholderTextColor={mutedText}
+              value={title}
+              onChangeText={setTitle}
+              editable={!isLoading && !isSaving}
+            />
           </View>
-          <TextInput
-            style={[
-              styles.fullInput,
-              { color: textColor, backgroundColor: '#FFFFFF', borderColor },
-            ]}
-            placeholder="Event Title"
-            placeholderTextColor={mutedText}
-            value={title}
-            onChangeText={setTitle}
-          />
 
-          <View style={styles.fieldRow}>
-            <Ionicons name="location" size={20} color="#FF3B30" />
-            <View style={styles.fieldContent}>
+          <View style={[styles.fieldRow, styles.locationRow]}>
+            <View style={styles.iconColumn}>
+              <Ionicons name="location" size={20} color="#FF3B30" />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Location</Text>
             </View>
+            <LocationPicker
+              value={location}
+              onChange={setLocation}
+              placeholder="Add Location"
+              disabled={isLoading || isSaving}
+              inline={true}
+            />
           </View>
-          <LocationPicker
-            value={location}
-            onChange={setLocation}
-            placeholder="Add Location"
-            disabled={isSaving}
-          />
 
-          <TouchableOpacity style={styles.fieldRow} onPress={() => setShowTravelModal(true)}>
-            <Ionicons name="car" size={20} color="#FF9500" />
-            <View style={styles.fieldContent}>
-              <Text style={[styles.fieldLabel, { color: textColor }]}>Travel Time</Text>
-            </View>
-            <View style={styles.fieldValue}>
-              <Text style={[styles.fieldValueText, { color: textColor }]}>
-                {travelTimeMinutes != null ? `${travelTimeMinutes} min` : 'Add'}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color={mutedText} />
-            </View>
-          </TouchableOpacity>
 
           <View style={[styles.fieldRow, styles.lastFieldRow]}>
-            <Ionicons name="link" size={20} color={accent} />
-            <View style={styles.fieldContent}>
+            <View style={styles.iconColumn}>
+              <Ionicons name="link" size={20} color={accent} />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>URL</Text>
             </View>
+            <TextInput
+              style={[
+                styles.titleInput,
+                { color: textColor, backgroundColor: surfaceColor },
+              ]}
+              placeholder="Add link"
+              placeholderTextColor={mutedText}
+              value={url}
+              onChangeText={setUrl}
+              editable={!isLoading && !isSaving}
+              autoCapitalize="none"
+            />
           </View>
-          <TextInput
-            style={[
-              styles.fullInput,
-              { color: textColor, backgroundColor: '#FFFFFF', borderColor },
-            ]}
-            placeholder="Add link"
-            placeholderTextColor={mutedText}
-            value={url}
-            onChangeText={setUrl}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
         </View>
 
         {/* Time and Recurrence Card */}
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+        <View style={[styles.card, { backgroundColor: cardColor }]}>
           <TouchableOpacity
             style={styles.fieldRow}
-            onPress={() => setIsAllDay(!isAllDay)}>
+            onPress={() => setIsAllDay(!isAllDay)}
+            disabled={isLoading || isSaving}>
             <Ionicons name="time-outline" size={20} color={accent} />
             <View style={styles.fieldContent}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>All-day</Text>
             </View>
             <View style={styles.fieldValue}>
-              <Text style={[styles.fieldValueText, { color: textColor }, isAllDay && styles.activeValue]}>
+              <Text
+                style={[
+                  styles.fieldValueText,
+                  { color: textColor },
+                  isAllDay && styles.activeValue,
+                ]}>
                 {isAllDay ? 'Yes' : 'No'}
               </Text>
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.fieldRow}
-            onPress={() => showPicker('date', 'start')}>
-            <View style={styles.fieldContent}>
+          <View style={styles.fieldRow}>
+            <View style={styles.iconColumn}>
+              <Ionicons name="calendar-outline" size={20} color={accent} />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Starts</Text>
             </View>
-            <View style={styles.fieldValue}>
-              <Text style={[styles.fieldValueText, styles.interactiveText, { color: textColor }]}>
-                {formatDate(startDate)}
-              </Text>
+            <View style={styles.dateTimeButtons}>
+              <TouchableOpacity
+                style={[styles.dateButton, { backgroundColor: surfaceColor }]}
+                onPress={() => showPicker('startDate')}
+                disabled={isLoading || isSaving}>
+                <Text style={[styles.dateButtonText, { color: textColor }]}>
+                  {formatDate(startDate)}
+                </Text>
+              </TouchableOpacity>
               {!isAllDay && (
-                <TouchableOpacity onPress={() => showPicker('time', 'start')}>
-                  <Text style={[styles.fieldValueText, styles.timeText, styles.interactiveText, { color: textColor }]}>
-                    {' '}{formatTime(startDate)}
+                <TouchableOpacity
+                  style={[styles.timeButton, { backgroundColor: surfaceColor }]}
+                  onPress={() => showPicker('startTime')}
+                  disabled={isLoading || isSaving}>
+                  <Text style={[styles.timeButtonText, { color: textColor }]}>
+                    {formatTime(startDate)}
                   </Text>
                 </TouchableOpacity>
               )}
             </View>
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity
-            style={styles.fieldRow}
-            onPress={() => showPicker('date', 'end')}>
-            <View style={styles.fieldContent}>
+          <View style={styles.fieldRow}>
+            <View style={styles.iconColumn}>
+              <Ionicons name="calendar-outline" size={20} color={accent} />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Ends</Text>
             </View>
-            <View style={styles.fieldValue}>
-              <Text style={[styles.fieldValueText, styles.interactiveText, { color: textColor }]}>
-                {formatDate(endDate)}
-              </Text>
+            <View style={styles.dateTimeButtons}>
+              <TouchableOpacity
+                style={[styles.dateButton, { backgroundColor: surfaceColor }]}
+                onPress={() => showPicker('endDate')}
+                disabled={isLoading || isSaving}>
+                <Text style={[styles.dateButtonText, { color: textColor }]}>
+                  {formatDate(endDate)}
+                </Text>
+              </TouchableOpacity>
               {!isAllDay && (
-                <TouchableOpacity onPress={() => showPicker('time', 'end')}>
-                  <Text style={[styles.fieldValueText, styles.timeText, styles.interactiveText, { color: textColor }]}>
-                    {' '}{formatTime(endDate)}
+                <TouchableOpacity
+                  style={[styles.timeButton, { backgroundColor: surfaceColor }]}
+                  onPress={() => showPicker('endTime')}
+                  disabled={isLoading || isSaving}>
+                  <Text style={[styles.timeButtonText, { color: textColor }]}>
+                    {formatTime(endDate)}
                   </Text>
                 </TouchableOpacity>
               )}
             </View>
-          </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={[styles.fieldRow, styles.lastFieldRow]}
-            onPress={() => setShowRecurrenceModal(true)}>
+            onPress={() => setShowRecurrenceModal(true)}
+            disabled={isLoading || isSaving}>
             <Ionicons name="refresh" size={20} color={mutedText} />
             <View style={styles.fieldContent}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Repeat</Text>
             </View>
             <View style={styles.fieldValue}>
-              <Text style={[styles.fieldValueText, { color: textColor }]}>{recurrenceLabel()}</Text>
+              <Text style={[styles.fieldValueText, { color: textColor }]}>
+                {recurrenceLabel()}
+              </Text>
               <Ionicons name="chevron-forward" size={20} color={mutedText} />
             </View>
           </TouchableOpacity>
         </View>
 
+        {/* Date/Time Picker Modal - Standardized for all platforms */}
+        {activePicker && (
+          <Modal
+            visible={true}
+            transparent
+            animationType="fade"
+            onRequestClose={closePicker}>
+            <TouchableOpacity
+              style={styles.pickerModalOverlay}
+              activeOpacity={1}
+              onPress={closePicker}>
+              <TouchableOpacity
+                activeOpacity={1}
+                style={[styles.pickerModalContent, { backgroundColor: cardColor }]}
+                onPress={(e) => e.stopPropagation()}>
+                <View style={styles.pickerHeader}>
+                  <Text style={[styles.pickerTitle, { color: textColor }]}>
+                    {activePicker.includes('start') ? 'Start' : 'End'}{' '}
+                    {activePicker.includes('Date') ? 'Date' : 'Time'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={closePicker}>
+                    <Text style={[styles.pickerDoneButton, { color: accent }]}>
+                      Done
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {activePicker.includes('Date') ? (
+                  <WebDatePicker
+                    value={activePicker.includes('start') ? startDate : endDate}
+                    onChange={(date) => {
+                      handleDateChange(null, date);
+                      if (Platform.OS !== 'web') closePicker();
+                    }}
+                  />
+                ) : (
+                  Platform.OS === 'ios' && DateTimePicker ? (
+                    <DateTimePicker
+                      value={activePicker.includes('start') ? startDate : endDate}
+                      mode="time"
+                      display="spinner"
+                      onChange={handleTimeChange}
+                      textColor={textColor}
+                      themeVariant="dark"
+                    />
+                  ) : Platform.OS === 'android' && DateTimePicker ? (
+                    <DateTimePicker
+                      value={activePicker.includes('start') ? startDate : endDate}
+                      mode="time"
+                      display="default"
+                      onChange={handleTimeChange}
+                    />
+                  ) : (
+                    <WebTimePicker
+                      value={activePicker.includes('start') ? startDate : endDate}
+                      onChange={(date) => {
+                        handleTimeChange(null, date);
+                      }}
+                    />
+                  )
+                )}
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Modal>
+        )}
+
         {/* Invitees and Settings Card */}
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
+        <View style={[styles.card, { backgroundColor: cardColor }]}>
           <MemberPicker
             selectedIds={selectedMembers}
             onSelectionChange={setSelectedMembers}
@@ -1104,48 +1228,85 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
           )}
 
           <View style={styles.fieldRow}>
-            <Ionicons name="calendar" size={20} color="#FF3B30" />
-            <View style={styles.fieldContent}>
+            <View style={styles.secondCardIconColumn}>
+              <Ionicons name="calendar" size={20} color="#FF3B30" />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Calendar</Text>
             </View>
             <View style={styles.fieldValue}>
               <View style={styles.familyBadge}>
                 <View style={styles.greenDot} />
                 <Text style={[styles.familyText, { color: textColor }]}>
-                  {currentFamily?.name || 'Family'}
+                  {currentFamily?.name || 'Select invitees first'}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={mutedText} />
             </View>
           </View>
 
-          <TouchableOpacity style={styles.fieldRow} onPress={() => setShowDriverModal(true)}>
-            <Ionicons name="car" size={20} color="#34C759" />
-            <View style={styles.fieldContent}>
+          <TouchableOpacity
+            style={styles.fieldRow}
+            onPress={() => setShowDriverModal(true)}
+            disabled={isLoading || isSaving}>
+            <View style={styles.secondCardIconColumn}>
+              <Ionicons name="car" size={20} color="#34C759" />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Driver</Text>
             </View>
             <View style={styles.fieldValue}>
-              <Text style={[styles.fieldValueText, { color: textColor }]}>{getDriverName()}</Text>
+              <Text style={[styles.fieldValueText, { color: textColor }]}>
+                {getDriverName()}
+              </Text>
               <Ionicons name="chevron-forward" size={20} color={mutedText} />
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.fieldRow} onPress={() => setShowAlertsModal(true)}>
-            <Ionicons name="notifications" size={20} color="#FF3B30" />
-            <View style={styles.fieldContent}>
+          <TouchableOpacity
+            style={styles.fieldRow}
+            onPress={() => setShowTravelModal(true)}
+            disabled={isLoading || isSaving}>
+            <View style={styles.secondCardIconColumn}>
+              <Ionicons name="car" size={20} color="#FF9500" />
+            </View>
+            <View style={styles.labelColumn}>
+              <Text style={[styles.fieldLabel, { color: textColor }]}>Travel Time</Text>
+            </View>
+            <View style={styles.fieldValue}>
+              <Text style={[styles.fieldValueText, { color: textColor }]}>
+                {travelTimeMinutes != null ? `${travelTimeMinutes} min` : 'Add'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={mutedText} />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.fieldRow}
+            onPress={() => setShowAlertsModal(true)}
+            disabled={isLoading || isSaving}>
+            <View style={styles.secondCardIconColumn}>
+              <Ionicons name="notifications" size={20} color="#FF3B30" />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Alerts</Text>
             </View>
             <View style={styles.fieldValue}>
-              <Text style={[styles.fieldValueText, { color: textColor }]}>{alertsLabel()}</Text>
+              <Text style={[styles.fieldValueText, { color: textColor }]}>
+                {alertsLabel()}
+              </Text>
               <Ionicons name="chevron-forward" size={20} color={mutedText} />
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.fieldRow, styles.lastFieldRow]}
-            onPress={() => setShowAvailabilityModal(true)}>
-            <Ionicons name="radio-button-on" size={20} color={mutedText} />
-            <View style={styles.fieldContent}>
+            onPress={() => setShowAvailabilityModal(true)}
+            disabled={isLoading || isSaving}>
+            <View style={styles.secondCardIconColumn}>
+              <Ionicons name="radio-button-on" size={20} color={mutedText} />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Show As</Text>
             </View>
             <View style={styles.fieldValue}>
@@ -1158,35 +1319,36 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
         </View>
 
         {/* Notes Card */}
-        <View style={[styles.card, { backgroundColor: cardColor, borderColor }]}>
-          <View style={styles.notesHeader}>
-            <Ionicons name="document-text" size={20} color="#FFD60A" />
-            <Text style={[styles.notesLabel, { color: textColor }]}>Notes</Text>
-          </View>
+        <View style={[styles.card, { backgroundColor: cardColor }]}>
+          <Text style={[styles.notesLabel, { color: textColor }]}>Notes</Text>
           <TextInput
             style={[
               styles.notesInput,
-              { color: textColor, backgroundColor: '#FFFFFF', borderColor },
+              { color: textColor, backgroundColor: surfaceColor },
             ]}
-            placeholder="Add notes"
+            placeholder="Add notes..."
             placeholderTextColor={mutedText}
             value={notes}
             onChangeText={setNotes}
             multiline
             numberOfLines={6}
             textAlignVertical="top"
+            editable={!isLoading && !isSaving}
           />
         </View>
 
-        {/* Delete Event Button */}
+        {/* Delete Button */}
         <TouchableOpacity
-          style={[styles.deleteButton, isDeleting && styles.buttonDisabled]}
+          style={[styles.deleteButton, { opacity: (isLoading || isSaving || isDeleting) ? 0.5 : 1 }]}
           onPress={handleDelete}
-          disabled={isDeleting}>
+          disabled={isLoading || isSaving || isDeleting}>
           {isDeleting ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator size="small" color="#FF3B30" />
           ) : (
-            <Text style={styles.deleteButtonText}>Delete Event</Text>
+            <>
+              <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+              <Text style={styles.deleteButtonText}>Delete Event</Text>
+            </>
           )}
         </TouchableOpacity>
 
@@ -1258,7 +1420,7 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
                       styles.chipButton,
                       (recurrence.frequency === freq ||
                         (freq === 'none' && !recurrence.isRecurring)) &&
-                        styles.chipButtonActive,
+                      styles.chipButtonActive,
                     ]}
                     onPress={() =>
                       setFrequency(freq === 'none' ? null : (freq as any))
@@ -1268,7 +1430,7 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
                         styles.chipButtonText,
                         (recurrence.frequency === freq ||
                           (freq === 'none' && !recurrence.isRecurring)) &&
-                          styles.chipButtonTextActive,
+                        styles.chipButtonTextActive,
                         { color: textColor },
                       ]}>
                       {freq === 'none'
@@ -1350,8 +1512,8 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
                             {mode === 'never'
                               ? 'Never'
                               : mode === 'onDate'
-                              ? 'On date'
-                              : 'After count'}
+                                ? 'On date'
+                                : 'After count'}
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -1429,12 +1591,12 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
             animationType="slide"
             onRequestClose={() => setShowRecurrenceEndDatePicker(false)}>
             <TouchableOpacity
-              style={styles.iosPickerOverlay}
+              style={styles.pickerModalOverlay}
               activeOpacity={1}
               onPress={() => setShowRecurrenceEndDatePicker(false)}>
               <TouchableOpacity
                 activeOpacity={1}
-                style={styles.iosPickerContent}
+                style={styles.pickerModalContent}
                 onPress={(e) => e.stopPropagation()}>
                 <View style={styles.pickerHeader}>
                   <Text style={styles.pickerTitle}>End Date</Text>
@@ -1593,129 +1755,6 @@ export function EditEventView({ eventId, occurrence, onRegisterSave }: EditEvent
           </TouchableOpacity>
         </Modal>
       </ScrollView>
-
-      {/* Date/Time Picker Modals */}
-      {Platform.OS === 'web' ? (
-        <Modal
-          transparent={true}
-          visible={showDatePicker || showTimePicker}
-          onRequestClose={() => {
-            setShowDatePicker(false);
-            setShowTimePicker(false);
-          }}>
-          <TouchableOpacity
-            style={styles.webPickerOverlay}
-            activeOpacity={1}
-            onPress={() => {
-              setShowDatePicker(false);
-              setShowTimePicker(false);
-            }}>
-            <View style={styles.webPickerContainer}>
-              {showDatePicker && (
-                <WebDatePicker
-                  value={currentPickerField === 'start' ? startDate : endDate}
-                  onChange={(newDate) => {
-                    if (currentPickerField === 'start') {
-                      const updated = new Date(newDate);
-                      updated.setHours(startDate.getHours(), startDate.getMinutes());
-                      setStartDate(updated);
-                      if (updated.getTime() >= endDate.getTime()) {
-                        const newEnd = new Date(updated);
-                        newEnd.setHours(updated.getHours() + 1);
-                        setEndDate(newEnd);
-                      }
-                    } else {
-                      const updated = new Date(newDate);
-                      updated.setHours(endDate.getHours(), endDate.getMinutes());
-                      setEndDate(updated);
-                    }
-                    setShowDatePicker(false);
-                  }}
-                />
-              )}
-              {showTimePicker && (
-                <WebTimePicker
-                  value={currentPickerField === 'start' ? startDate : endDate}
-                  onChange={(newTime) => {
-                    if (currentPickerField === 'start') {
-                      const updated = new Date(startDate);
-                      updated.setHours(newTime.getHours(), newTime.getMinutes());
-                      setStartDate(updated);
-                      if (updated.getTime() >= endDate.getTime()) {
-                        const newEnd = new Date(updated);
-                        newEnd.setHours(updated.getHours() + 1);
-                        setEndDate(newEnd);
-                      }
-                    } else {
-                      const updated = new Date(endDate);
-                      updated.setHours(newTime.getHours(), newTime.getMinutes());
-                      setEndDate(updated);
-                    }
-                  }}
-                />
-              )}
-              {(showDatePicker || showTimePicker) && (
-                <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={() => {
-                    setShowDatePicker(false);
-                    setShowTimePicker(false);
-                  }}>
-                  <Text style={styles.modalCloseButtonText}>Done</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </TouchableOpacity>
-        </Modal>
-      ) : (
-        <>
-          {(showDatePicker || showTimePicker) && (
-            <Modal
-              transparent
-              visible={showDatePicker || showTimePicker}
-              animationType="slide"
-              onRequestClose={() => {
-                setShowDatePicker(false);
-                setShowTimePicker(false);
-              }}>
-              <TouchableOpacity
-                style={styles.iosPickerOverlay}
-                activeOpacity={1}
-                onPress={() => {
-                  setShowDatePicker(false);
-                  setShowTimePicker(false);
-                }}>
-                <TouchableOpacity
-                  activeOpacity={1}
-                  style={styles.iosPickerContent}
-                  onPress={(e) => e.stopPropagation()}>
-                  <View style={styles.pickerHeader}>
-                    <Text style={styles.pickerTitle}>
-                      {currentPickerField === 'start' ? 'Start' : 'End'}{' '}
-                      {showDatePicker ? 'Date' : 'Time'}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setShowDatePicker(false);
-                        setShowTimePicker(false);
-                      }}>
-                      <Text style={styles.pickerDoneButton}>Done</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <DateTimePicker
-                    value={currentPickerField === 'start' ? startDate : endDate}
-                    mode={showDatePicker ? 'date' : 'time'}
-                    display="spinner"
-                    onChange={showDatePicker ? handleDateChange : handleTimeChange}
-                    textColor="#1D1D1F"
-                    themeVariant="light"
-                  />
-                </TouchableOpacity>
-              </TouchableOpacity>
-            </Modal>
-          )}
-        </>
-      )}
     </View>
   );
 }
@@ -1775,6 +1814,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     marginBottom: 0,
   },
+  locationRow: {
+    borderBottomWidth: 0,
+    marginBottom: 0,
+  },
   lastFieldRow: {
     borderBottomWidth: 0,
   },
@@ -1786,10 +1829,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '400',
     color: '#1D1D1F',
+    textAlign: 'left',
   },
   fieldValue: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   fieldValueText: {
     fontSize: 15,
@@ -1809,6 +1855,64 @@ const styles = StyleSheet.create({
     color: '#1D1D1F',
   },
   titleInput: {
+    flex: 1,
+    height: 38,
+    fontSize: 16,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    textAlign: 'right',
+  },
+  iconColumn: {
+    width: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondCardIconColumn: {
+    width: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -6,
+  },
+  labelColumn: {
+    width: 90,
+    justifyContent: 'center',
+  },
+  locationInput: {
+    flex: 1,
+    height: 38,
+    fontSize: 15,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginLeft: 12,
+  },
+  dateTimeButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  dateButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  dateButtonText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  timeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  timeButtonText: {
+    fontSize: 15,
+    fontWeight: '500',
   },
   fullInput: {
     width: '100%',
@@ -1821,46 +1925,6 @@ const styles = StyleSheet.create({
     color: '#1D1D1F',
     marginTop: 8,
   },
-  familyBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 4,
-  },
-  greenDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#34C759',
-    marginRight: 6,
-  },
-  familyText: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: '#1D1D1F',
-  },
-  notesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  notesLabel: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: '#1D1D1F',
-    marginLeft: 12,
-  },
-  notesInput: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: '#1D1D1F',
-    minHeight: 140,
-    textAlignVertical: 'top',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: 'transparent',
-  },
   saveButton: {
     backgroundColor: '#007AFF',
     borderRadius: 12,
@@ -1868,25 +1932,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  deleteButton: {
-    backgroundColor: '#FF3B30',
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
   saveButtonText: {
     fontSize: 17,
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    paddingVertical: 16,
+    marginTop: 8,
+    marginHorizontal: 16,
+    borderRadius: 12,
+  },
   deleteButtonText: {
+    color: '#FF3B30',
     fontSize: 17,
     fontWeight: '600',
-    color: '#FFFFFF',
+    marginLeft: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   webPickerOverlay: {
     flex: 1,
@@ -1994,6 +2062,39 @@ const styles = StyleSheet.create({
     minWidth: 20,
     textAlign: 'center',
   },
+  pickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  pickerModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 0,
+    width: '100%',
+    maxWidth: 420,
+    overflow: 'hidden',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E7',
+  },
+  pickerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1D1D1F',
+  },
+  pickerDoneButton: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
   dayChip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -2037,5 +2138,44 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 320,
     alignSelf: 'flex-end',
+  },
+  familyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  greenDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#34C759',
+    marginRight: 6,
+  },
+  familyText: {
+    fontSize: 15,
+    fontWeight: '400',
+    color: '#1D1D1F',
+  },
+  notesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  notesLabel: {
+    fontSize: 15,
+    fontWeight: '400',
+    color: '#1D1D1F',
+    marginBottom: 8,
+  },
+  notesInput: {
+    fontSize: 15,
+    fontWeight: '400',
+    color: '#1D1D1F',
+    minHeight: 140,
+    textAlignVertical: 'top',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: 'transparent',
   },
 });

@@ -1,13 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { Platform } from 'react-native';
+import { Contact, EventParticipant, supabase } from '@/lib/supabase';
+import { getUserContactForFamily } from '@/services/contactService';
+import { EventWithDetails, getEventsForDateRange, getEventsForMonth, getTodayEvents, getUpcomingEvents } from '@/services/eventService';
+import { getPersonalCalendarEventsForUser, PersonalCalendarEvent } from '@/services/personalCalendarService';
 import * as SecureStore from 'expo-secure-store';
-import { supabase, Contact, EventParticipant } from '@/lib/supabase';
-import { EventWithDetails, getTodayEvents, getUpcomingEvents, getEventsForDateRange, getEventsForMonth } from '@/services/eventService';
-import { useFamily } from './FamilyContext';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { useAppSettings } from './AppSettingsContext';
 import { useAuth } from './AuthContext';
-import { getPersonalCalendarEventsForUser, PersonalCalendarEvent } from '@/services/personalCalendarService';
-import { getUserContactForFamily } from '@/services/contactService';
+import { useFamily } from './FamilyContext';
 
 interface CacheEntry {
   events: EventWithDetails[];
@@ -65,14 +65,14 @@ function deserializeCache(raw: string): { [key: string]: CacheEntry } {
 // Helper to determine which cache keys need invalidation based on event date
 function getCacheKeysForEvent(eventDate: Date): string[] {
   const keys: string[] = ['today', 'upcoming'];
-  
+
   const year = eventDate.getFullYear();
-  const month = eventDate.getMonth() + 1;
-  const day = eventDate.getDate();
-  
+  const month = (eventDate.getMonth() + 1).toString().padStart(2, '0');
+  const day = eventDate.getDate().toString().padStart(2, '0');
+
   keys.push(`month:${year}-${month}`);
   keys.push(`day:${year}-${month}-${day}`);
-  
+
   return keys;
 }
 
@@ -81,13 +81,13 @@ function cleanOldCacheEntries(cache: { [key: string]: CacheEntry }): { [key: str
   const now = Date.now();
   const maxAge = MAX_CACHE_AGE_DAYS * 24 * 60 * 60 * 1000;
   const cleaned: { [key: string]: CacheEntry } = {};
-  
+
   for (const [key, entry] of Object.entries(cache)) {
     if (now - entry.lastFetched < maxAge) {
       cleaned[key] = entry;
     }
   }
-  
+
   return cleaned;
 }
 
@@ -103,21 +103,21 @@ function trimCacheForStorage(cache: { [key: string]: CacheEntry }, maxSizeBytes:
     }
     return entryA.lastFetched - entryB.lastFetched;
   });
-  
+
   const trimmed: { [key: string]: CacheEntry } = {};
-  
+
   for (const [key, entry] of entries) {
     trimmed[key] = entry;
     const testRaw = serializeCache(trimmed);
     const testSize = testRaw.length; // Use string length as estimate
-    
+
     if (testSize > maxSizeBytes) {
       // Remove the last added entry if it exceeds the limit
       delete trimmed[key];
       break;
     }
   }
-  
+
   return trimmed;
 }
 
@@ -130,7 +130,7 @@ async function convertPersonalCalendarEventToEventWithDetails(
 ): Promise<EventWithDetails> {
   // Get user's contact for this family
   const { data: userContact } = await getUserContactForFamily(userId, familyId);
-  
+
   // Create participant entry for the user
   const participants: (EventParticipant & { contact: Contact })[] = [];
   if (userContact) {
@@ -140,7 +140,7 @@ async function convertPersonalCalendarEventToEventWithDetails(
       ...userContact,
       color: calendarColor, // Use the iOS calendar color
     };
-    
+
     participants.push({
       id: `temp-${personalEvent.id}`,
       event_id: `personal-${personalEvent.calendarId}-${personalEvent.id}`,
@@ -153,7 +153,7 @@ async function convertPersonalCalendarEventToEventWithDetails(
       contact: contactWithCalendarColor,
     });
   }
-  
+
   return {
     id: `personal-${personalEvent.calendarId}-${personalEvent.id}`,
     family_id: familyId,
@@ -234,13 +234,13 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
       try {
         const storageKey = getStorageKey(currentFamily.id);
         let raw: string | null = null;
-        
+
         if (Platform.OS === 'web') {
           raw = window.localStorage.getItem(storageKey);
         } else {
           raw = await SecureStore.getItemAsync(storageKey);
         }
-        
+
         if (raw) {
           const loaded = deserializeCache(raw);
           const cleaned = cleanOldCacheEntries(loaded);
@@ -260,7 +260,7 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
           setCache(resetLoading);
           // Update ref immediately
           cacheRef.current = resetLoading;
-          
+
           // Save cleaned cache back (with isLoading reset)
           const cleanedRaw = serializeCache(resetLoading);
           if (Platform.OS === 'web') {
@@ -276,7 +276,7 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
         cacheLoadedRef.current = true;
       }
     }
-    
+
     loadCache();
   }, [currentFamily?.id]);
 
@@ -299,13 +299,13 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
           return acc;
         }, {} as { [key: string]: CacheEntry });
         const raw = serializeCache(cacheToSave);
-        
+
         // Check size before saving (SecureStore has 2048 byte limit)
         // Use string length as approximation (UTF-8 characters are typically 1-4 bytes)
         // This is a conservative estimate - actual size may be slightly larger
         const estimatedSize = raw.length;
         const MAX_SIZE = 1800; // Conservative limit below 2048
-        
+
         if (Platform.OS === 'web') {
           window.localStorage.setItem(storageKey, raw);
         } else {
@@ -323,7 +323,7 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
         console.warn('Failed to save event cache:', err);
       }
     }
-    
+
     // Debounce saves to avoid too many writes
     const timeoutId = setTimeout(saveCache, 1000);
     return () => clearTimeout(timeoutId);
@@ -368,7 +368,7 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
       let events: EventWithDetails[] = [];
       let startDate: Date | null = null;
       let endDate: Date | null = null;
-      
+
       if (key === 'today') {
         const today = new Date();
         startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -436,8 +436,8 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
             const convertedPersonalEvents = await Promise.all(
               personalEvents.map(event =>
                 convertPersonalCalendarEventToEventWithDetails(
-                  event, 
-                  user.id, 
+                  event,
+                  user.id,
                   currentFamily.id,
                   event.calendarColor // Pass the iOS calendar color
                 )
@@ -489,12 +489,12 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
   const ensureEventsFetched = useCallback((key: string, forceRefresh = false) => {
     // Read from ref to avoid dependency on cache state
     const entry = cacheRef.current[key];
-    
+
     // Detect stuck fetches: if fetch started more than 30 seconds ago and still loading, consider it stuck
     const STUCK_FETCH_TIMEOUT_MS = 30000; // 30 seconds
     const fetchStartTime = fetchStartTimeRef.current[key];
     const isStuck = entry?.isLoading && fetchStartTime && (Date.now() - fetchStartTime) > STUCK_FETCH_TIMEOUT_MS;
-    
+
     if (isStuck) {
       console.warn(`[EventCache] Detected stuck fetch for ${key} (${Math.round((Date.now() - fetchStartTime) / 1000)}s), resetting`);
       // Clear the stuck state
@@ -512,7 +512,7 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
         cacheRef.current[key] = { ...cacheRef.current[key], isLoading: false };
       }
     }
-    
+
     // Always try to refresh in background if we have any cached data, regardless of staleness
     // This ensures we show cached data immediately and update in background
     if (entry && entry.lastFetched > 0) {
@@ -523,8 +523,8 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
 
         // Refresh if stale or if it's been more than 5 minutes since last fetch (more aggressive background updates)
         const shouldRefresh = forceRefresh ||
-                             (autoRefreshMs && cacheAge >= autoRefreshMs) ||
-                             (cacheAge >= 5 * 60 * 1000); // 5 minutes minimum
+          (autoRefreshMs && cacheAge >= autoRefreshMs) ||
+          (cacheAge >= 5 * 60 * 1000); // 5 minutes minimum
 
         if (shouldRefresh) {
           console.log(`[EventCache] Background refresh for ${key} (age: ${Math.round(cacheAge / 1000 / 60)}min)`);
@@ -610,17 +610,17 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
         },
         (payload) => {
           console.log('Event change detected:', payload.eventType, payload.new || payload.old);
-          
+
           // Determine which cache keys to invalidate
           let keysToInvalidate: string[] = [];
-          
+
           if (payload.eventType === 'INSERT' && payload.new) {
             const eventDate = new Date((payload.new as any).start_time);
             keysToInvalidate = getCacheKeysForEvent(eventDate);
           } else if (payload.eventType === 'UPDATE' && payload.new) {
             const newEventDate = new Date((payload.new as any).start_time);
             const oldEventDate = payload.old ? new Date((payload.old as any).start_time) : newEventDate;
-            
+
             // Invalidate both old and new dates
             keysToInvalidate = [
               ...getCacheKeysForEvent(newEventDate),
@@ -630,16 +630,16 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
             const eventDate = new Date((payload.old as any).start_time);
             keysToInvalidate = getCacheKeysForEvent(eventDate);
           }
-          
+
           // Also always invalidate today and upcoming
           keysToInvalidate.push('today', 'upcoming');
-          
+
           // Remove duplicates
           keysToInvalidate = Array.from(new Set(keysToInvalidate));
-          
+
           // Invalidate cache
           invalidateCache(keysToInvalidate);
-          
+
           // Trigger refresh for invalidated keys
           setTimeout(() => {
             keysToInvalidate.forEach(key => {
@@ -657,11 +657,11 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
         },
         (payload) => {
           console.log('Event participant change detected:', payload.eventType);
-          
+
           // When participants change, we need to invalidate all caches
           // because participant changes affect how events are displayed
           invalidateCache();
-          
+
           // Trigger refresh for today and upcoming
           setTimeout(() => {
             fetchEventsForKey('today', true);
@@ -694,24 +694,24 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
     }
 
     const intervalMs = settings.autoRefreshMinutes * 60 * 1000;
-    
+
     refreshIntervalRef.current = setInterval(() => {
       // Refresh stale cache entries using functional state update
       setCache(prev => {
         const now = Date.now();
         const staleKeys: string[] = [];
-        
+
         for (const [key, entry] of Object.entries(prev)) {
           if (!entry.isLoading && (now - entry.lastFetched) >= intervalMs) {
             staleKeys.push(key);
           }
         }
-        
+
         // Refresh stale entries (fire and forget)
         for (const key of staleKeys) {
           fetchEventsForKey(key, false);
         }
-        
+
         return prev; // Don't modify state here
       });
     }, intervalMs);
@@ -739,12 +739,12 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
         await new Promise(resolve => setTimeout(resolve, 50));
         waited += 50;
       }
-      
+
       // Fetch today and upcoming events (only if not already cached)
       ensureEventsFetched('today', false);
       ensureEventsFetched('upcoming', false);
     };
-    
+
     waitForCacheLoad();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFamily?.id]);

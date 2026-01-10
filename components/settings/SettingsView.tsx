@@ -1,16 +1,19 @@
-import React from 'react';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { getCalendarPermissionStatus, requestCalendarPermissions } from '@/services/calendarImportService';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
+  Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useThemeColor } from '@/hooks/use-theme-color';
 
 // Try to import LinearGradient, fallback to View if not available
 let LinearGradient: any;
@@ -29,16 +32,17 @@ interface SettingsItemProps {
   icon: keyof typeof Ionicons.glyphMap;
   iconColor?: string;
   label: string;
+  value?: string;
   onPress?: () => void;
 }
 
-function SettingsItem({ icon, iconColor = '#1D1D1F', label, onPress }: SettingsItemProps) {
+function SettingsItem({ icon, iconColor = '#1D1D1F', label, value, onPress }: SettingsItemProps) {
   const textColor = useThemeColor({}, 'text');
   const mutedColor = useThemeColor({ light: '#8E8E93', dark: '#9EA0A6' }, 'text');
   // Special handling for Shared Calendars icon (calendar with plus)
   const isSharedCalendars = label === 'Shared Calendars';
   const isSavedPlaces = label === 'Saved Places';
-  
+
   return (
     <TouchableOpacity style={styles.settingsItem} onPress={onPress}>
       {isSharedCalendars ? (
@@ -55,6 +59,9 @@ function SettingsItem({ icon, iconColor = '#1D1D1F', label, onPress }: SettingsI
         <Ionicons name={icon} size={20} color={iconColor || textColor} />
       )}
       <Text style={[styles.settingsItemText, { color: textColor }]}>{label}</Text>
+      {value && (
+        <Text style={[styles.settingsItemValue, { color: mutedColor }]}>{value}</Text>
+      )}
       <Ionicons name="create-outline" size={20} color={mutedColor} />
     </TouchableOpacity>
   );
@@ -69,6 +76,54 @@ export function SettingsView() {
   const subTextColor = useThemeColor({ light: '#8E8E93', dark: '#9EA0A6' }, 'text');
   const separatorColor = useThemeColor({ light: '#F5F5F7', dark: '#2C2C2E' }, 'background');
   const surfaceColor = useThemeColor({ light: '#F5F5F7', dark: '#2C2C2E' }, 'background');
+
+  const [calendarPermissionStatus, setCalendarPermissionStatus] = useState<string>('loading');
+
+  useEffect(() => {
+    checkPermission();
+  }, []);
+
+  const checkPermission = async () => {
+    if (Platform.OS === 'ios') {
+      const { status } = await getCalendarPermissionStatus();
+      setCalendarPermissionStatus(status);
+    } else {
+      setCalendarPermissionStatus('unsupported');
+    }
+  };
+
+  const handleCalendarPermissionPress = async () => {
+    if (Platform.OS !== 'ios') return;
+
+    if (calendarPermissionStatus === 'granted') {
+      Alert.alert('Calendar Access', 'You have granted access to your iOS calendar.');
+    } else if (calendarPermissionStatus === 'denied' || calendarPermissionStatus === 'blocked') {
+      Alert.alert(
+        'Permission Denied',
+        'To enable calendar access, please go to Settings and allow access.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Settings', onPress: () => Linking.openSettings() },
+        ]
+      );
+    } else {
+      const { status } = await requestCalendarPermissions();
+      setCalendarPermissionStatus(status);
+      if (status === 'granted') {
+        Alert.alert('Success', 'Calendar access granted!');
+      }
+    }
+  };
+
+  const getPermissionLabel = () => {
+    switch (calendarPermissionStatus) {
+      case 'granted': return 'Authorized';
+      case 'denied': return 'Denied';
+      case 'undetermined': return 'Not Determined';
+      case 'loading': return 'Checking...';
+      default: return '';
+    }
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor }]}>
@@ -152,11 +207,11 @@ export function SettingsView() {
           <View style={[styles.separator, { backgroundColor: separatorColor }]} />
           <SettingsItem icon="color-palette-outline" label="Themes" iconColor={textColor} />
           <View style={[styles.separator, { backgroundColor: separatorColor }]} />
-          <SettingsItem 
-            icon="location-outline" 
-            label="Saved Places" 
+          <SettingsItem
+            icon="location-outline"
+            label="Saved Places"
             onPress={() => router.push('/settings/saved-locations')}
-            iconColor={textColor} 
+            iconColor={textColor}
           />
           <View style={[styles.separator, { backgroundColor: separatorColor }]} />
           <SettingsItem icon="car-outline" label="Drivers" iconColor={textColor} />
@@ -180,7 +235,15 @@ export function SettingsView() {
         {/* More Section */}
         <Text style={[styles.sectionHeader, { color: subTextColor }]}>More</Text>
         <View style={[styles.card, { backgroundColor: cardColor }]}>
-          {/* Additional items can be added here */}
+          {Platform.OS === 'ios' && (
+            <SettingsItem
+              icon="calendar-outline"
+              label="Calendar Access"
+              value={getPermissionLabel()}
+              onPress={handleCalendarPermissionPress}
+              iconColor={textColor}
+            />
+          )}
         </View>
       </ScrollView>
     </View>
@@ -343,5 +406,11 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#F5F5F7',
     marginLeft: 32,
+  },
+  settingsItemValue: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: '#8E8E93',
+    marginRight: 4,
   },
 });

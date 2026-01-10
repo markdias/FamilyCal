@@ -1,30 +1,30 @@
-import React, { useState, useCallback } from 'react';
-import { 
-  ScrollView, 
-  StyleSheet, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  View,
+import { getCacheKeysForEventDate, useEventCache } from '@/contexts/EventCacheContext';
+import { useFamily } from '@/contexts/FamilyContext';
+import { useSelectedDate } from '@/contexts/SelectedDateContext';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import type { RecurrenceInput, ReminderInput } from '@/services/eventService';
+import { createEvent } from '@/services/eventService';
+import { trackLocationUsage } from '@/services/recentLocationsService';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import {
   ActivityIndicator,
   Alert,
-  Platform,
   Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { LocationPicker } from './LocationPicker';
 import { MemberPicker, SelectedMembersDisplay } from './MemberPicker';
 import { WebDatePicker, WebTimePicker } from './WebDatePicker';
-import { LocationPicker } from './LocationPicker';
-import { useFamily } from '@/contexts/FamilyContext';
-import { useEventCache , getCacheKeysForEventDate } from '@/contexts/EventCacheContext';
-import { useSelectedDate } from '@/contexts/SelectedDateContext';
-import { createEvent } from '@/services/eventService';
-import type { ReminderInput, RecurrenceInput } from '@/services/eventService';
-import { trackLocationUsage } from '@/services/recentLocationsService';
-import { useThemeColor } from '@/hooks/use-theme-color';
 
 // Only import DateTimePicker on native platforms
 let DateTimePicker: any = null;
@@ -48,7 +48,7 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
   const textColor = useThemeColor({}, 'text');
   const mutedText = useThemeColor({ light: '#8E8E93', dark: '#9EA0A6' }, 'text');
   const accent = useThemeColor({ light: '#007AFF', dark: '#0A84FF' }, 'tint');
-  
+
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState<import('@/services/locationService').LocationResult | null>(null);
   const [notes, setNotes] = useState('');
@@ -76,12 +76,12 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
   });
   const [recurrenceEndMode, setRecurrenceEndMode] = useState<'never' | 'onDate' | 'afterCount'>('never');
   const [showRecurrenceEndDatePicker, setShowRecurrenceEndDatePicker] = useState(false);
-  
+
   // Date/time state - use selected date if available, otherwise default to today with 1 hour event
   const getInitialDates = () => {
     const baseDate = selectedDate || new Date();
     const defaultStart = new Date(baseDate);
-    
+
     // If selected date is provided, set to 9 AM on that date
     if (selectedDate) {
       defaultStart.setHours(9, 0, 0, 0);
@@ -89,23 +89,18 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
       // Default to next hour
       defaultStart.setHours(baseDate.getHours() + 1, 0, 0, 0);
     }
-    
+
     const defaultEnd = new Date(defaultStart);
     defaultEnd.setHours(defaultStart.getHours() + 1);
-    
+
     return { defaultStart, defaultEnd };
   };
-  
+
   const { defaultStart, defaultEnd } = getInitialDates();
   const [startDate, setStartDate] = useState(defaultStart);
   const [endDate, setEndDate] = useState(defaultEnd);
-  
+
   // Date/time picker state
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-  const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [activePicker, setActivePicker] = useState<'startDate' | 'startTime' | 'endDate' | 'endTime' | null>(null);
 
   // Reset form when screen comes into focus
@@ -134,20 +129,20 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
       });
       setRecurrenceEndMode('never');
       setShowRecurrenceEndDatePicker(false);
-      
+
       // Reset dates - use selected date if available
       const baseDate = selectedDate || new Date();
       const newStart = new Date(baseDate);
-      
+
       if (selectedDate) {
         newStart.setHours(9, 0, 0, 0);
       } else {
         newStart.setHours(baseDate.getHours() + 1, 0, 0, 0);
       }
-      
+
       const newEnd = new Date(newStart);
       newEnd.setHours(newStart.getHours() + 1);
-      
+
       setStartDate(newStart);
       setEndDate(newEnd);
     }, [selectedDate])
@@ -155,17 +150,17 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
 
   // Format date for display
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-GB', { 
-      day: 'numeric', 
-      month: 'short', 
-      year: 'numeric' 
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
     });
   };
 
   // Format time for display
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-GB', { 
-      hour: '2-digit', 
+    return date.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
       minute: '2-digit',
       hour12: false,
     });
@@ -277,12 +272,12 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
     if (Platform.OS === 'android') {
       setActivePicker(null);
     }
-    
+
     if (event?.type === 'dismissed') {
       setActivePicker(null);
       return;
     }
-    
+
     if (!selectedDate) return;
 
     applyDateChange(selectedDate);
@@ -298,7 +293,7 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
         newStart.setHours(selectedDate.getHours(), selectedDate.getMinutes());
       }
       setStartDate(newStart);
-      
+
       // If end date is now before start date, update it
       if (endDate <= newStart) {
         const newEnd = new Date(newStart);
@@ -312,7 +307,7 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
       } else {
         newEnd.setHours(selectedDate.getHours(), selectedDate.getMinutes());
       }
-      
+
       // Ensure end is after start
       if (newEnd > startDate) {
         setEndDate(newEnd);
@@ -370,7 +365,7 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
 
     try {
       console.log('Creating event with participants:', selectedMembers);
-      
+
       const recurrencePayload = buildRecurrencePayload();
 
       const { data, error } = await createEvent(
@@ -397,11 +392,11 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
         alerts
       );
 
-      console.log('[AddEventView] Event creation result:', { 
-        hasData: !!data, 
+      console.log('[AddEventView] Event creation result:', {
+        hasData: !!data,
         hasError: !!error,
         eventId: data?.id,
-        errorMessage: error?.message 
+        errorMessage: error?.message
       });
 
       if (error) {
@@ -434,7 +429,7 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
       const keysToInvalidate = getCacheKeysForEventDate(eventDate);
       console.log('[AddEventView] Invalidating cache keys:', keysToInvalidate);
       eventCache.invalidateCache(keysToInvalidate);
-      
+
       // Trigger refresh for today and upcoming (always needed for FamilyView)
       // Use a longer delay to ensure database transaction is committed
       // and realtime subscription has time to process
@@ -449,11 +444,11 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
 
       // Clear selected date and navigate to the main tab
       clearSelectedDate();
-      router.replace('/(tabs)/');
+      router.replace('/');
     } catch (err: any) {
       console.error('[AddEventView] Error creating event:', err);
       let errorMessage = 'Failed to create event. Please try again.';
-      
+
       if (err?.message) {
         errorMessage = err.message;
       } else if (err?.details) {
@@ -461,10 +456,10 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
       } else if (typeof err === 'string') {
         errorMessage = err;
       }
-      
+
       const errorCode = err?.code ? ` (Code: ${err.code})` : '';
       const errorHint = err?.hint ? `\n\nHint: ${err.hint}` : '';
-      
+
       if (Platform.OS === 'web') {
         window.alert(`Error: ${errorMessage}${errorCode}${errorHint}`);
       } else {
@@ -496,14 +491,14 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
   // Expose the handler to parent component (only once, using ref to avoid loops)
   const handlerRef = React.useRef(handleAddEvent);
   handlerRef.current = handleAddEvent;
-  
+
   React.useEffect(() => {
     if (onAddRef) {
       // Pass a stable wrapper function that always calls the latest handler
       onAddRef(() => handlerRef.current());
     }
     // Only run once when onAddRef changes, not when handleAddEvent changes
-     
+
   }, [onAddRef]);
 
   const handleRemoveMember = (id: string) => {
@@ -523,8 +518,12 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
         {/* Event Details Card */}
         <View style={[styles.card, { backgroundColor: cardColor }]}>
           <View style={[styles.fieldRow, styles.titleRow]}>
-            <Ionicons name="menu" size={20} color={mutedText} />
-            <Text style={[styles.fieldLabel, { color: textColor }]}>Title</Text>
+            <View style={styles.iconColumn}>
+              <Ionicons name="menu" size={20} color={mutedText} />
+            </View>
+            <View style={styles.labelColumn}>
+              <Text style={[styles.fieldLabel, { color: textColor }]}>Title</Text>
+            </View>
             <TextInput
               style={[styles.titleInput, { color: textColor, backgroundColor: surfaceColor }]}
               placeholder="Event Title"
@@ -535,39 +534,32 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
             />
           </View>
 
-          <View style={styles.fieldRow}>
-            <Ionicons name="location" size={20} color="#FF3B30" />
-            <View style={styles.fieldContent}>
+          <View style={[styles.fieldRow, styles.locationRow]}>
+            <View style={styles.iconColumn}>
+              <Ionicons name="location" size={20} color="#FF3B30" />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Location</Text>
             </View>
+            <LocationPicker
+              value={location}
+              onChange={setLocation}
+              placeholder="Add Location"
+              disabled={isLoading}
+              inline={true}
+            />
           </View>
-          <LocationPicker
-            value={location}
-            onChange={setLocation}
-            placeholder="Add Location"
-            disabled={isLoading}
-          />
 
-          <TouchableOpacity style={styles.fieldRow} onPress={() => setShowTravelModal(true)}>
-            <Ionicons name="car" size={20} color="#FF9500" />
-            <View style={styles.fieldContent}>
-              <Text style={[styles.fieldLabel, { color: textColor }]}>Travel Time</Text>
-            </View>
-            <View style={styles.fieldValue}>
-              <Text style={[styles.fieldValueText, { color: textColor }]}>
-                {travelTimeMinutes != null ? `${travelTimeMinutes} min` : 'Add'}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color={mutedText} />
-            </View>
-          </TouchableOpacity>
 
           <View style={[styles.fieldRow, styles.lastFieldRow]}>
-            <Ionicons name="link" size={20} color={accent} />
-            <View style={styles.fieldContent}>
+            <View style={styles.iconColumn}>
+              <Ionicons name="link" size={20} color={accent} />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>URL</Text>
             </View>
             <TextInput
-              style={[styles.locationInput, { color: textColor, backgroundColor: surfaceColor }]}
+              style={[styles.titleInput, { color: textColor, backgroundColor: surfaceColor }]}
               placeholder="Add link"
               placeholderTextColor={mutedText}
               value={url}
@@ -596,18 +588,21 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
           </TouchableOpacity>
 
           <View style={styles.fieldRow}>
-            <View style={styles.fieldContent}>
+            <View style={styles.iconColumn}>
+              <Ionicons name="calendar-outline" size={20} color={accent} />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Starts</Text>
             </View>
             <View style={styles.dateTimeButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.dateButton, { backgroundColor: surfaceColor }]}
                 onPress={() => openPicker('startDate')}
                 disabled={isLoading}>
                 <Text style={[styles.dateButtonText, { color: textColor }]}>{formatDate(startDate)}</Text>
               </TouchableOpacity>
               {!isAllDay && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.timeButton, { backgroundColor: surfaceColor }]}
                   onPress={() => openPicker('startTime')}
                   disabled={isLoading}>
@@ -618,18 +613,21 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
           </View>
 
           <View style={styles.fieldRow}>
-            <View style={styles.fieldContent}>
+            <View style={styles.iconColumn}>
+              <Ionicons name="calendar-outline" size={20} color={accent} />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Ends</Text>
             </View>
             <View style={styles.dateTimeButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.dateButton, { backgroundColor: surfaceColor }]}
                 onPress={() => openPicker('endDate')}
                 disabled={isLoading}>
                 <Text style={[styles.dateButtonText, { color: textColor }]}>{formatDate(endDate)}</Text>
               </TouchableOpacity>
               {!isAllDay && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.timeButton, { backgroundColor: surfaceColor }]}
                   onPress={() => openPicker('endTime')}
                   disabled={isLoading}>
@@ -654,19 +652,19 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
           </TouchableOpacity>
         </View>
 
-        {/* Date/Time Picker Modal (Web) */}
-        {Platform.OS === 'web' && activePicker && (
+        {/* Date/Time Picker Modal - Standardized for all platforms */}
+        {activePicker && (
           <Modal
             visible={true}
             transparent
             animationType="fade"
             onRequestClose={closePicker}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.pickerModalOverlay}
               activeOpacity={1}
               onPress={closePicker}>
-              <TouchableOpacity 
-                activeOpacity={1} 
+              <TouchableOpacity
+                activeOpacity={1}
                 style={[styles.pickerModalContent, { backgroundColor: cardColor }]}
                 onPress={(e) => e.stopPropagation()}>
                 <View style={styles.pickerHeader}>
@@ -682,65 +680,38 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
                     value={activePicker.includes('start') ? startDate : endDate}
                     onChange={(date) => {
                       applyDateChange(date);
+                      if (Platform.OS !== 'web') closePicker();
                     }}
                   />
                 ) : (
-                  <WebTimePicker
-                    value={activePicker.includes('start') ? startDate : endDate}
-                    onChange={(date) => {
-                      applyDateChange(date);
-                    }}
-                  />
+                  Platform.OS === 'ios' && DateTimePicker ? (
+                    <DateTimePicker
+                      value={activePicker.includes('start') ? startDate : endDate}
+                      mode="time"
+                      display="spinner"
+                      onChange={handleDateChange}
+                      textColor={textColor}
+                      themeVariant="dark"
+                    />
+                  ) : Platform.OS === 'android' && DateTimePicker ? (
+                    <DateTimePicker
+                      value={activePicker.includes('start') ? startDate : endDate}
+                      mode="time"
+                      display="default"
+                      onChange={handleDateChange}
+                    />
+                  ) : (
+                    <WebTimePicker
+                      value={activePicker.includes('start') ? startDate : endDate}
+                      onChange={(date) => {
+                        applyDateChange(date);
+                      }}
+                    />
+                  )
                 )}
               </TouchableOpacity>
             </TouchableOpacity>
           </Modal>
-        )}
-
-        {/* Date/Time Picker (iOS) */}
-        {Platform.OS === 'ios' && activePicker && DateTimePicker && (
-          <Modal
-            visible={true}
-            transparent
-            animationType="slide"
-            onRequestClose={closePicker}>
-            <TouchableOpacity 
-              style={styles.iosPickerOverlay}
-              activeOpacity={1}
-              onPress={closePicker}>
-              <TouchableOpacity 
-                activeOpacity={1} 
-                style={[styles.iosPickerContent, { backgroundColor: cardColor }]}
-                onPress={(e) => e.stopPropagation()}>
-                <View style={styles.pickerHeader}>
-                  <Text style={[styles.pickerTitle, { color: textColor }]}>
-                    {activePicker.includes('start') ? 'Start' : 'End'} {activePicker.includes('Date') ? 'Date' : 'Time'}
-                  </Text>
-                  <TouchableOpacity onPress={closePicker}>
-                    <Text style={[styles.pickerDoneButton, { color: accent }]}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-                <DateTimePicker
-                  value={activePicker.includes('start') ? startDate : endDate}
-                  mode={activePicker.includes('Date') ? 'date' : 'time'}
-                  display="spinner"
-                  onChange={handleDateChange}
-                  textColor={textColor}
-                  themeVariant="dark"
-                />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </Modal>
-        )}
-
-        {/* Date/Time Picker (Android) */}
-        {Platform.OS === 'android' && activePicker && DateTimePicker && (
-          <DateTimePicker
-            value={activePicker.includes('start') ? startDate : endDate}
-            mode={activePicker.includes('Date') ? 'date' : 'time'}
-            display="default"
-            onChange={handleDateChange}
-          />
         )}
 
         {/* Invitees and Settings Card */}
@@ -751,7 +722,7 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
             label="Invitees"
             placeholder="None"
           />
-          
+
           {selectedMembers.length > 0 && (
             <SelectedMembersDisplay
               selectedIds={selectedMembers}
@@ -760,8 +731,10 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
           )}
 
           <View style={styles.fieldRow}>
-            <Ionicons name="calendar" size={20} color="#FF3B30" />
-            <View style={styles.fieldContent}>
+            <View style={styles.secondCardIconColumn}>
+              <Ionicons name="calendar" size={20} color="#FF3B30" />
+            </View>
+            <View style={styles.labelColumn}>
               <Text style={[styles.fieldLabel, { color: textColor }]}>Calendar</Text>
             </View>
             <View style={styles.fieldValue}>
@@ -775,40 +748,61 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
             </View>
           </View>
 
-        <TouchableOpacity style={styles.fieldRow} onPress={() => setShowDriverModal(true)}>
-          <Ionicons name="car" size={20} color="#34C759" />
-          <View style={styles.fieldContent}>
-            <Text style={[styles.fieldLabel, { color: textColor }]}>Driver</Text>
-          </View>
-          <View style={styles.fieldValue}>
-            <Text style={[styles.fieldValueText, { color: textColor }]}>{getDriverName()}</Text>
-            <Ionicons name="chevron-forward" size={20} color={mutedText} />
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.fieldRow} onPress={() => setShowDriverModal(true)}>
+            <View style={styles.secondCardIconColumn}>
+              <Ionicons name="car" size={20} color="#34C759" />
+            </View>
+            <View style={styles.labelColumn}>
+              <Text style={[styles.fieldLabel, { color: textColor }]}>Driver</Text>
+            </View>
+            <View style={styles.fieldValue}>
+              <Text style={[styles.fieldValueText, { color: textColor }]}>{getDriverName()}</Text>
+              <Ionicons name="chevron-forward" size={20} color={mutedText} />
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.fieldRow} onPress={() => setShowAlertsModal(true)}>
-          <Ionicons name="notifications" size={20} color="#FF3B30" />
-          <View style={styles.fieldContent}>
-            <Text style={[styles.fieldLabel, { color: textColor }]}>Alerts</Text>
-          </View>
-          <View style={styles.fieldValue}>
-            <Text style={[styles.fieldValueText, { color: textColor }]}>{alertsLabel()}</Text>
-            <Ionicons name="chevron-forward" size={20} color={mutedText} />
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.fieldRow} onPress={() => setShowTravelModal(true)}>
+            <View style={styles.secondCardIconColumn}>
+              <Ionicons name="car" size={20} color="#FF9500" />
+            </View>
+            <View style={styles.labelColumn}>
+              <Text style={[styles.fieldLabel, { color: textColor }]}>Travel Time</Text>
+            </View>
+            <View style={styles.fieldValue}>
+              <Text style={[styles.fieldValueText, { color: textColor }]}>
+                {travelTimeMinutes != null ? `${travelTimeMinutes} min` : 'Add'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={mutedText} />
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.fieldRow, styles.lastFieldRow]}
-          onPress={() => setShowAvailabilityModal(true)}>
-          <Ionicons name="radio-button-on" size={20} color={mutedText} />
-          <View style={styles.fieldContent}>
-            <Text style={[styles.fieldLabel, { color: textColor }]}>Show As</Text>
-          </View>
-          <View style={styles.fieldValue}>
-            <Text style={[styles.fieldValueText, { color: textColor }]}>{availability === 'busy' ? 'Busy' : 'Free'}</Text>
-            <Ionicons name="chevron-forward" size={20} color={mutedText} />
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.fieldRow} onPress={() => setShowAlertsModal(true)}>
+            <View style={styles.secondCardIconColumn}>
+              <Ionicons name="notifications" size={20} color="#FF3B30" />
+            </View>
+            <View style={styles.labelColumn}>
+              <Text style={[styles.fieldLabel, { color: textColor }]}>Alerts</Text>
+            </View>
+            <View style={styles.fieldValue}>
+              <Text style={[styles.fieldValueText, { color: textColor }]}>{alertsLabel()}</Text>
+              <Ionicons name="chevron-forward" size={20} color={mutedText} />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.fieldRow, styles.lastFieldRow]}
+            onPress={() => setShowAvailabilityModal(true)}>
+            <View style={styles.secondCardIconColumn}>
+              <Ionicons name="radio-button-on" size={20} color={mutedText} />
+            </View>
+            <View style={styles.labelColumn}>
+              <Text style={[styles.fieldLabel, { color: textColor }]}>Show As</Text>
+            </View>
+            <View style={styles.fieldValue}>
+              <Text style={[styles.fieldValueText, { color: textColor }]}>{availability === 'busy' ? 'Busy' : 'Free'}</Text>
+              <Ionicons name="chevron-forward" size={20} color={mutedText} />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Notes Card */}
@@ -907,7 +901,7 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
                       styles.chipButton,
                       (recurrence.frequency === freq ||
                         (freq === 'none' && !recurrence.isRecurring)) &&
-                        styles.chipButtonActive,
+                      styles.chipButtonActive,
                     ]}
                     onPress={() =>
                       setFrequency(freq === 'none' ? null : (freq as any))
@@ -917,7 +911,7 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
                         styles.chipButtonText,
                         (recurrence.frequency === freq ||
                           (freq === 'none' && !recurrence.isRecurring)) &&
-                          styles.chipButtonTextActive,
+                        styles.chipButtonTextActive,
                         { color: textColor },
                       ]}>
                       {freq === 'none'
@@ -1000,8 +994,8 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
                             {mode === 'never'
                               ? 'Never'
                               : mode === 'onDate'
-                              ? 'On date'
-                              : 'After count'}
+                                ? 'On date'
+                                : 'After count'}
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -1266,9 +1260,9 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   fieldRow: {
     flexDirection: 'row',
@@ -1278,6 +1272,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F5F5F7',
   },
   titleRow: {
+    borderBottomWidth: 0,
+    marginBottom: 0,
+  },
+  locationRow: {
     borderBottomWidth: 0,
     marginBottom: 0,
   },
@@ -1291,10 +1289,13 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 15,
     fontWeight: '400',
+    textAlign: 'left',
   },
   fieldValue: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   fieldValueText: {
     fontSize: 15,
@@ -1309,10 +1310,26 @@ const styles = StyleSheet.create({
   },
   titleInput: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: '400',
+    height: 38,
+    fontSize: 16,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     textAlign: 'right',
-    marginLeft: 12,
+  },
+  iconColumn: {
+    width: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondCardIconColumn: {
+    width: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -6,
+  },
+  labelColumn: {
+    width: 90,
+    justifyContent: 'center',
   },
   locationInput: {
     flex: 0,
@@ -1365,6 +1382,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   dateButton: {
     borderRadius: 8,

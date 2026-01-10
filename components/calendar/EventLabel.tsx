@@ -1,5 +1,5 @@
 import DiagonalColorSplit from '@/components/ui/DiagonalColorSplit';
-import { getContrastingTextColor, normalizeColorForDisplay } from '@/utils/colorUtils';
+import { getContrastingTextColor } from '@/utils/colorUtils';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';

@@ -51,6 +51,7 @@ interface LocationPickerProps {
   onChange: (location: LocationResult | null) => void;
   placeholder?: string;
   disabled?: boolean;
+  inline?: boolean;
 }
 
 export function LocationPicker({
@@ -58,6 +59,7 @@ export function LocationPicker({
   onChange,
   placeholder = 'Add Location',
   disabled = false,
+  inline = false,
 }: LocationPickerProps) {
   const { currentFamily } = useFamily();
   const backgroundColor = useThemeColor({}, 'background');
@@ -202,7 +204,7 @@ export function LocationPicker({
     <>
       {/* Display selected location or button to open picker */}
       {value ? (
-        <View style={styles.selectedContainer}>
+        <View style={[styles.selectedContainer, inline && styles.selectedContainerInline]}>
           <View style={styles.selectedContent}>
             <Ionicons name="location" size={20} color="#FF3B30" />
             <View style={styles.selectedTextContainer}>
@@ -220,7 +222,7 @@ export function LocationPicker({
         </View>
       ) : (
         <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: surfaceColor }]}
+          style={[styles.addButton, { backgroundColor: surfaceColor }, inline && styles.addButtonInline]}
           onPress={handleOpenModal}
           disabled={disabled}>
           <Ionicons name="location-outline" size={20} color={mutedText} />
@@ -414,6 +416,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '400',
     marginLeft: 8,
+  },
+  addButtonInline: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  selectedContainerInline: {
+    flex: 1,
   },
   modalOverlay: {
     flex: 1,

@@ -107,7 +107,7 @@ export function CreateFamilyView() {
         { name: 'Sports', color: '#CCFFE5' },
         { name: 'Work', color: '#FFE5CC' },
         { name: 'Medical', color: '#CCE5FF' },
-        { name: 'Family', color: '#FFEB3B' },
+        { name: 'Family', color: '#FF9500' },
       ];
 
       await supabase.from('event_categories').insert(

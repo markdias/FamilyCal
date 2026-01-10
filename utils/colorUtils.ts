@@ -1,4 +1,4 @@
-// Standard RGB color palette - darker colors that don't get modified by normalizeColorForDisplay
+// Member color palette aligned with iOS Calendar system colors
 export const MEMBER_COLORS = [
   '#DC2626', // Red
   '#EA580C', // Orange
@@ -19,14 +19,14 @@ export const FAMILY_EVENT_COLOR = '#334155';
 // Get the next available color from the palette
 export function getNextAvailableColor(usedColors: (string | null)[]): string {
   const usedSet = new Set(usedColors.filter(Boolean));
-  
+
   // Find first unused color from the palette
   for (const color of MEMBER_COLORS) {
     if (!usedSet.has(color)) {
       return color;
     }
   }
-  
+
   // If all colors are used, return a random one from the palette
   return MEMBER_COLORS[Math.floor(Math.random() * MEMBER_COLORS.length)];
 }
@@ -38,17 +38,17 @@ export function getEventColor(
   familyColor: string = FAMILY_EVENT_COLOR
 ): string {
   const validColors = participantColors.filter((c): c is string => c !== null);
-  
+
   if (validColors.length === 0) {
-    return normalizeColorForDisplay(fallbackColor || MEMBER_COLORS[0]);
+    return fallbackColor || MEMBER_COLORS[0];
   }
-  
+
   if (validColors.length === 1) {
-    return normalizeColorForDisplay(validColors[0]);
+    return validColors[0];
   }
-  
+
   // Multiple participants - use the family event color
-  return normalizeColorForDisplay(familyColor);
+  return familyColor;
 }
 
 // Blend multiple hex colors by averaging RGB channels
@@ -77,12 +77,12 @@ export function blendColors(colors: string[]): string {
 export function darkenColor(hex: string, percent: number = 15): string {
   // Remove # if present
   const color = hex.replace('#', '');
-  
+
   const num = parseInt(color, 16);
   const r = Math.max(0, (num >> 16) - Math.round(255 * (percent / 100)));
   const g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(255 * (percent / 100)));
   const b = Math.max(0, (num & 0x0000FF) - Math.round(255 * (percent / 100)));
-  
+
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
@@ -98,19 +98,19 @@ export function normalizeColorForDisplay(hex: string, percent: number = 22): str
 export function getVibrantColor(hex: string): string {
   // Remove # if present
   const color = hex.replace('#', '');
-  
+
   const r = parseInt(color.substring(0, 2), 16);
   const g = parseInt(color.substring(2, 4), 16);
   const b = parseInt(color.substring(4, 6), 16);
-  
+
   // Increase saturation by moving away from gray
   const avg = (r + g + b) / 3;
   const factor = 1.3;
-  
+
   const newR = Math.min(255, Math.max(0, Math.round(avg + (r - avg) * factor)));
   const newG = Math.min(255, Math.max(0, Math.round(avg + (g - avg) * factor)));
   const newB = Math.min(255, Math.max(0, Math.round(avg + (b - avg) * factor)));
-  
+
   return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
 }
 
@@ -120,7 +120,7 @@ export function isLightColor(hex: string): boolean {
   const r = parseInt(color.substring(0, 2), 16);
   const g = parseInt(color.substring(2, 4), 16);
   const b = parseInt(color.substring(4, 6), 16);
-  
+
   // Calculate relative luminance
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.5;
@@ -138,12 +138,12 @@ export function formatDisplayName(
   familyName?: string | null
 ): string {
   if (!lastName) return firstName;
-  
+
   // Only show last name if it's different from the family name
   if (familyName) {
     const normalizedLastName = lastName.toLowerCase().trim();
     const normalizedFamilyName = familyName.toLowerCase().trim();
-    
+
     // Check if family name contains the last name or vice versa
     if (normalizedLastName === normalizedFamilyName ||
         normalizedFamilyName.includes(normalizedLastName) ||
@@ -151,6 +151,6 @@ export function formatDisplayName(
       return firstName;
     }
   }
-  
+
   return `${firstName} ${lastName}`;
 }

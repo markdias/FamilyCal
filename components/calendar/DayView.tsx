@@ -1,28 +1,28 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useEventCache } from '@/contexts/EventCacheContext';
+import { useFamily } from '@/contexts/FamilyContext';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { Contact } from '@/lib/supabase';
+import { EventWithDetails, updateEvent } from '@/services/eventService';
+import { getPersonalCalendarEventsForUser, PersonalCalendarEvent } from '@/services/personalCalendarService';
+import { FAMILY_EVENT_COLOR, formatDisplayName, getEventColor } from '@/utils/colorUtils';
+import { FamilyEvent } from '@/utils/mockEvents';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Dimensions,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator,
-  Dimensions,
-  Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FamilyEvent } from '@/utils/mockEvents';
-import { DraggableEvent } from './DraggableEvent';
 import { CalendarHeader } from './CalendarHeader';
-import { useFamily } from '@/contexts/FamilyContext';
-import { useEventCache } from '@/contexts/EventCacheContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { EventWithDetails, updateEvent } from '@/services/eventService';
-import { getPersonalCalendarEventsForUser, PersonalCalendarEvent } from '@/services/personalCalendarService';
-import { FAMILY_EVENT_COLOR, getContrastingTextColor, getEventColor, formatDisplayName, normalizeColorForDisplay, blendColors } from '@/utils/colorUtils';
-import { useThemeColor } from '@/hooks/use-theme-color';
-import { useAppSettings } from '@/contexts/AppSettingsContext';
-import { Contact } from '@/lib/supabase';
+import { DraggableEvent } from './DraggableEvent';
 
 const MONTH_NAMES = [
   'January',
@@ -82,23 +82,21 @@ function mapSupabaseEventsToFamilyEventsForCalendar(
     let gradientColors: string[] | undefined;
     
     if (isAllFamilyEvent) {
-      color = normalizeColorForDisplay(baseFamilyColor);
+      color = baseFamilyColor;
       // No gradient for all-family events
     } else if (validColors.length > 1) {
       // Multiple participants - create gradient from all participant colors
-      color = normalizeColorForDisplay(validColors[0]); // Fallback for backward compatibility
-      gradientColors = validColors.map(c => normalizeColorForDisplay(c));
+      color = validColors[0]; // Fallback for backward compatibility
+      gradientColors = validColors;
     } else if (validColors.length === 1) {
       // Single participant - use their color
-      color = normalizeColorForDisplay(validColors[0]);
+      color = validColors[0];
     } else {
       // No participants - use default
-      color = normalizeColorForDisplay(
-        getEventColor(
-          validColors,
-          event.category?.color,
-          baseFamilyColor
-        )
+      color = getEventColor(
+        validColors,
+        event.category?.color,
+        baseFamilyColor
       );
     }
     

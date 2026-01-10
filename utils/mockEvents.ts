@@ -16,7 +16,7 @@ export interface MockEvent {
 export const PASTEL_COLORS = {
   orange: '#FFE5CC',
   purple: '#E5CCFF',
-  yellow: '#FFEB3B',
+  yellow: '#FF9500',
   green: '#CCFFE5',
   blue: '#CCE5FF',
 };

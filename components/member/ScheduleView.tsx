@@ -1,25 +1,24 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { WebDatePicker } from '@/components/event/WebDatePicker';
+import { ScheduleSettingsModal } from '@/components/ui/ScheduleSettingsModal';
+import { useAuth } from '@/contexts/AuthContext';
+import { useEventCache } from '@/contexts/EventCacheContext';
+import { useFamily } from '@/contexts/FamilyContext';
+import { getUserPreferences, updateScheduleTimes } from '@/services/userPreferencesService';
+import { formatDisplayName } from '@/utils/colorUtils';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator,
-  Modal,
-  Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useFamily } from '@/contexts/FamilyContext';
-import { useEventCache } from '@/contexts/EventCacheContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { getUserPreferences, updateScheduleTimes } from '@/services/userPreferencesService';
-import { EventWithDetails } from '@/services/eventService';
-import { formatDisplayName } from '@/utils/colorUtils';
-import { ScheduleSettingsModal } from '@/components/ui/ScheduleSettingsModal';
-import { WebDatePicker } from '@/components/event/WebDatePicker';
 // Only import DateTimePicker on native platforms
 let DateTimePicker: any = null;
 if (Platform.OS !== 'web') {
@@ -55,7 +54,7 @@ interface TimelineEvent {
 export function ScheduleView({ memberName }: ScheduleViewProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { currentFamily } = useFamily();
+  const { currentFamily, familyMembers } = useFamily();
   const { user } = useAuth();
   const eventCache = useEventCache();
 
@@ -75,8 +74,8 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
   // Helper function to check if two dates are the same day
   const isSameDay = (date1: Date, date2: Date): boolean => {
     return date1.getFullYear() === date2.getFullYear() &&
-           date1.getMonth() === date2.getMonth() &&
-           date1.getDate() === date2.getDate();
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate();
   };
 
   // Get display mode for the selected date
@@ -107,13 +106,14 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
     loadPreferences();
   }, [user]);
 
-  // Fetch events for selected day
+  // Fetch events for selected day and upcoming for highlighting
   useEffect(() => {
     if (currentFamily) {
       const dayKey = `day:${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.getDate().toString().padStart(2, '0')}`;
       eventCache.ensureEventsFetched(dayKey, false);
+      eventCache.ensureEventsFetched('upcoming', false);
     }
-  }, [currentFamily, selectedDate]);
+  }, [currentFamily, selectedDate, eventCache]);
 
   // Get events for selected day
   const dayEvents = useMemo(() => {
@@ -123,7 +123,7 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
     const rawEvents = eventCache.getEvents(dayKey);
 
     // Filter events for this member
-    return rawEvents.filter(event => {
+    const filtered = rawEvents.filter(event => {
       return event.participants?.some(participant => {
         if (!participant.contact) return false;
         const displayName = formatDisplayName(
@@ -134,7 +134,46 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
         return displayName === memberName;
       });
     });
+
+    return filtered;
   }, [eventCache, selectedDate, currentFamily, memberName]);
+
+  // Generate marked dates for the calendar picker
+  const markedDates = useMemo(() => {
+    const upcomingEvents = eventCache.getEvents('upcoming');
+    const memberEvents = upcomingEvents.filter(event => {
+      return event.participants?.some(participant => {
+        if (!participant.contact) return false;
+        const displayName = formatDisplayName(
+          participant.contact.first_name,
+          participant.contact.last_name,
+          currentFamily?.name
+        );
+        return displayName === memberName;
+      });
+    });
+
+    const dates = new Set<string>();
+    memberEvents.forEach(event => {
+      const date = new Date(event.start_time);
+      const dateStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+      dates.add(dateStr);
+    });
+    return dates;
+  }, [eventCache, memberName, currentFamily]);
+
+  // Find the color for the current member
+  const memberColor = useMemo(() => {
+    const member = familyMembers.find(fm => {
+      const displayName = fm.contact ? formatDisplayName(
+        fm.contact.first_name,
+        fm.contact.last_name,
+        currentFamily?.name
+      ) : '';
+      return displayName === memberName;
+    });
+    return member?.contact?.color || '#007AFF';
+  }, [familyMembers, memberName, currentFamily]);
 
   // Calculate schedule statistics
   const scheduleStats: ScheduleStats = useMemo(() => {
@@ -414,53 +453,53 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
           <View style={styles.dateButtonsRow}>
             <View style={styles.dateButtons}>
               <TouchableOpacity
-              style={[
-                styles.dateButton,
-                getDateDisplayMode() === 'today' && styles.dateButtonActive,
-              ]}
-              onPress={() => handleQuickDateSelect('today')}>
-              <Text
                 style={[
-                  styles.dateButtonText,
-                  getDateDisplayMode() === 'today' && styles.dateButtonTextActive,
-                ]}>
-                Today
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.dateButton,
-                getDateDisplayMode() === 'tomorrow' && styles.dateButtonActive,
-              ]}
-              onPress={() => handleQuickDateSelect('tomorrow')}>
-              <Text
+                  styles.dateButton,
+                  getDateDisplayMode() === 'today' && styles.dateButtonActive,
+                ]}
+                onPress={() => handleQuickDateSelect('today')}>
+                <Text
+                  style={[
+                    styles.dateButtonText,
+                    getDateDisplayMode() === 'today' && styles.dateButtonTextActive,
+                  ]}>
+                  Today
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[
-                  styles.dateButtonText,
-                  getDateDisplayMode() === 'tomorrow' && styles.dateButtonTextActive,
-                ]}>
-                Tomorrow
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.dateButton,
-                getDateDisplayMode() === 'custom' && styles.dateButtonActive,
-              ]}
-              onPress={() => setCalendarModalVisible(true)}>
-              <Text
+                  styles.dateButton,
+                  getDateDisplayMode() === 'tomorrow' && styles.dateButtonActive,
+                ]}
+                onPress={() => handleQuickDateSelect('tomorrow')}>
+                <Text
+                  style={[
+                    styles.dateButtonText,
+                    getDateDisplayMode() === 'tomorrow' && styles.dateButtonTextActive,
+                  ]}>
+                  Tomorrow
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[
-                  styles.dateButtonText,
-                  getDateDisplayMode() === 'custom' && styles.dateButtonTextActive,
-                ]}>
-                Select Day
-              </Text>
-              <Ionicons
-                name="calendar-outline"
-                size={16}
-                color={getDateDisplayMode() === 'custom' ? '#FFFFFF' : '#1D1D1F'}
-                style={styles.calendarIcon}
-              />
-            </TouchableOpacity>
+                  styles.dateButton,
+                  getDateDisplayMode() === 'custom' && styles.dateButtonActive,
+                ]}
+                onPress={() => setCalendarModalVisible(true)}>
+                <Text
+                  style={[
+                    styles.dateButtonText,
+                    getDateDisplayMode() === 'custom' && styles.dateButtonTextActive,
+                  ]}>
+                  Select Day
+                </Text>
+                <Ionicons
+                  name="calendar-outline"
+                  size={16}
+                  color={getDateDisplayMode() === 'custom' ? '#FFFFFF' : '#1D1D1F'}
+                  style={styles.calendarIcon}
+                />
+              </TouchableOpacity>
             </View>
 
             {/* Adjust Schedule Button */}
@@ -538,47 +577,47 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
             <Text style={styles.timelineTitle}>Day Overview</Text>
             <Text style={styles.timelineSubtitle}>Visual timeline</Text>
           </View>
-        <View style={styles.timelineBar}>
-          <Text style={styles.timelineTime}>
-            {scheduleStats.dayStart.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-          <View style={styles.timelineLine}>
-            {timelineEvents.map(event => {
-              const totalDuration = scheduleStats.dayEnd.getTime() - scheduleStats.dayStart.getTime();
-              const eventDuration = event.endTime.getTime() - event.startTime.getTime();
-              const eventStart = event.startTime.getTime() - scheduleStats.dayStart.getTime();
+          <View style={styles.timelineBar}>
+            <Text style={styles.timelineTime}>
+              {scheduleStats.dayStart.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+            <View style={styles.timelineLine}>
+              {timelineEvents.map(event => {
+                const totalDuration = scheduleStats.dayEnd.getTime() - scheduleStats.dayStart.getTime();
+                const eventDuration = event.endTime.getTime() - event.startTime.getTime();
+                const eventStart = event.startTime.getTime() - scheduleStats.dayStart.getTime();
 
-              const left = (eventStart / totalDuration) * 100;
-              const width = (eventDuration / totalDuration) * 100;
+                const left = (eventStart / totalDuration) * 100;
+                const width = (eventDuration / totalDuration) * 100;
 
-              return (
-                <TouchableOpacity
-                  key={event.id}
-                  style={[
-                    styles.timelineEvent,
-                    {
-                      left: `${left}%`,
-                      width: `${width}%`,
-                      backgroundColor: event.color,
-                      opacity: (hoveredEventId || hoveredTimelineId)
-                        ? ((hoveredEventId === event.id || hoveredTimelineId === event.id) ? 1 : 0.3) // Highlight hovered item, fade others
-                        : (event.isFreeTime ? 0.7 : 1), // Default opacity when no hover
-                    },
-                  ]}
-                  onMouseEnter={() => {
-                    setHoveredTimelineId(event.id);
-                    setHoveredEventId(null); // Clear event hover
-                  }}
-                  onMouseLeave={() => setHoveredTimelineId(null)}
-                  activeOpacity={1} // Prevent opacity changes on press
-                />
-              );
-            })}
+                return (
+                  <TouchableOpacity
+                    key={event.id}
+                    style={[
+                      styles.timelineEvent,
+                      {
+                        left: `${left}%`,
+                        width: `${width}%`,
+                        backgroundColor: event.color,
+                        opacity: (hoveredEventId || hoveredTimelineId)
+                          ? ((hoveredEventId === event.id || hoveredTimelineId === event.id) ? 1 : 0.3) // Highlight hovered item, fade others
+                          : (event.isFreeTime ? 0.7 : 1), // Default opacity when no hover
+                      },
+                    ]}
+                    onMouseEnter={() => {
+                      setHoveredTimelineId(event.id);
+                      setHoveredEventId(null); // Clear event hover
+                    }}
+                    onMouseLeave={() => setHoveredTimelineId(null)}
+                    activeOpacity={1} // Prevent opacity changes on press
+                  />
+                );
+              })}
+            </View>
+            <Text style={styles.timelineTime}>
+              {scheduleStats.dayEnd.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
           </View>
-          <Text style={styles.timelineTime}>
-            {scheduleStats.dayEnd.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        </View>
         </View>
 
         {/* Schedule Timeline */}
@@ -668,61 +707,8 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
         onSave={handleSaveScheduleSettings}
       />
 
-      {/* iOS Calendar Picker Modal */}
-      {Platform.OS === 'ios' && calendarModalVisible && DateTimePicker && (
-        <Modal
-          visible={true}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setCalendarModalVisible(false)}
-        >
-          <TouchableOpacity
-            style={styles.iosPickerOverlay}
-            activeOpacity={1}
-            onPress={() => setCalendarModalVisible(false)}
-          >
-            <TouchableOpacity
-              style={styles.calendarModalContentCentered}
-              activeOpacity={1}
-              onPress={() => {}} // Prevent closing when tapping the modal content
-            >
-              <DateTimePicker
-                value={selectedDate}
-                mode="date"
-                display="spinner"
-                onChange={(event, selectedDate) => {
-                  if (event.type === 'set' && selectedDate) {
-                    handleDateSelect(selectedDate);
-                  } else if (event.type === 'dismissed') {
-                    setCalendarModalVisible(false);
-                  }
-                }}
-                textColor="#1D1D1F"
-                themeVariant="light"
-              />
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </Modal>
-      )}
-
-      {/* Android Calendar Picker - Native Overlay */}
-      {Platform.OS === 'android' && calendarModalVisible && DateTimePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          onChange={(event, selectedDate) => {
-            setCalendarModalVisible(false); // Always close modal after selection
-            if (event.type === 'set' && selectedDate) {
-              handleDateSelect(selectedDate);
-            }
-          }}
-          minimumDate={new Date()}
-        />
-      )}
-
-      {/* Web Calendar Picker - HTML Date Input */}
-      {Platform.OS === 'web' && calendarModalVisible && (
+      {/* Calendar Picker - Standardized for all platforms */}
+      {calendarModalVisible && (
         <Modal
           visible={true}
           transparent
@@ -737,7 +723,7 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
             <TouchableOpacity
               style={styles.calendarModalContentCentered}
               activeOpacity={1}
-              onPress={() => {}} // Prevent closing when tapping the modal content
+              onPress={() => { }} // Prevent closing when tapping the modal content
             >
               <View style={styles.pickerHeader}>
                 <Text style={styles.pickerTitle}>Select Date</Text>
@@ -751,6 +737,8 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
                   handleDateSelect(date);
                   setCalendarModalVisible(false);
                 }}
+                markedDates={markedDates}
+                dotColor={memberColor}
               />
             </TouchableOpacity>
           </TouchableOpacity>
