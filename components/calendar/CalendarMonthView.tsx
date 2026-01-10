@@ -1,21 +1,21 @@
-import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { ScrollView, StyleSheet, Text, View, Dimensions, ActivityIndicator, Platform } from 'react-native';
+import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { getMonthCacheKey, useEventCache } from '@/contexts/EventCacheContext';
+import { useFamily } from '@/contexts/FamilyContext';
+import { useSelectedDate } from '@/contexts/SelectedDateContext';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { Contact } from '@/lib/supabase';
+import { EventWithDetails } from '@/services/eventService';
+import { getPersonalCalendarEventsForUser, PersonalCalendarEvent } from '@/services/personalCalendarService';
+import { FAMILY_EVENT_COLOR, formatDisplayName, getEventColor } from '@/utils/colorUtils';
+import { generateMockEvents, MockEvent } from '@/utils/mockEvents';
 import { useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Dimensions, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CalendarHeader } from './CalendarHeader';
 import { DayCell } from './DayCell';
 import { DayView } from './DayView';
 import { ListView } from './ListView';
-import { generateMockEvents, MockEvent } from '@/utils/mockEvents';
-import { useFamily } from '@/contexts/FamilyContext';
-import { useEventCache } from '@/contexts/EventCacheContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { EventWithDetails } from '@/services/eventService';
-import { getPersonalCalendarEventsForUser, PersonalCalendarEvent } from '@/services/personalCalendarService';
-import { Contact } from '@/lib/supabase';
-import { FAMILY_EVENT_COLOR, getEventColor, formatDisplayName, blendColors } from '@/utils/colorUtils';
-import { useThemeColor } from '@/hooks/use-theme-color';
-import { useAppSettings } from '@/contexts/AppSettingsContext';
-import { useSelectedDate } from '@/contexts/SelectedDateContext';
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTH_NAMES = [
@@ -66,18 +66,18 @@ function mapSupabaseEventsToMockEvents(
 ): MockEvent[] {
   const results: MockEvent[] = [];
   const baseFamilyColor = familyColor || FAMILY_EVENT_COLOR;
-  
+
   for (const event of events) {
     // Get participant colors for determining event color
     const participantColors = event.participants?.map(
       (p) => p.contact?.color
     ) || [];
     const validColors = participantColors.filter((c): c is string => c !== null);
-    
+
     const allFamilyCount = familyMembers?.length || 0;
     const participantCount = event.participants?.length || 0;
     const isAllFamilyEvent = allFamilyCount > 0 && participantCount === allFamilyCount;
-    
+
     // Determine event color and gradient colors:
     // - If all family members: use family color (single color, no gradient)
     // - If multiple participants (but not all): use gradient with all participant colors
@@ -85,7 +85,7 @@ function mapSupabaseEventsToMockEvents(
     // - If no participants: use default color
     let color: string;
     let gradientColors: string[] | undefined;
-    
+
     if (isAllFamilyEvent) {
       color = baseFamilyColor;
       // No gradient for all-family events
@@ -104,7 +104,7 @@ function mapSupabaseEventsToMockEvents(
         baseFamilyColor
       );
     }
-    
+
     // Create ONE event per Supabase event (not per participant)
     // For person display, show all participants if multiple, or single participant name
     let personName: string | undefined;
@@ -122,7 +122,7 @@ function mapSupabaseEventsToMockEvents(
         }
       }
     }
-    
+
     results.push({
       id: event.id, // Single event ID (not per participant)
       originalEventId: event.original_event_id || event.id,
@@ -137,7 +137,7 @@ function mapSupabaseEventsToMockEvents(
       person: personName,
     });
   }
-  
+
   return results;
 }
 
@@ -181,6 +181,11 @@ export function CalendarMonthView() {
   const textColor = useThemeColor({}, 'text');
   const mutedText = useThemeColor({ light: '#8E8E93', dark: '#9EA0A6' }, 'text');
   const accent = useThemeColor({ light: '#007AFF', dark: '#0A84FF' }, 'tint');
+
+  // Persistent state keys
+  const STORAGE_KEY_DATE = 'familycal_calendar_base_date';
+  const STORAGE_KEY_MODE = 'familycal_calendar_view_mode';
+
   const [baseDate, setBaseDate] = useState(new Date());
   const scrollViewRef = useRef<ScrollView>(null);
   const [monthOffset, setMonthOffset] = useState(0);
@@ -189,6 +194,49 @@ export function CalendarMonthView() {
   const [personalCalendarEvents, setPersonalCalendarEvents] = useState<PersonalCalendarEvent[]>([]);
   const [calendarViewMode, setCalendarViewMode] = useState<'month' | 'daily' | 'list'>('month');
 
+  // Load persisted state
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      try {
+        const storedMode = window.localStorage.getItem(STORAGE_KEY_MODE);
+        if (storedMode === 'month' || storedMode === 'daily' || storedMode === 'list') {
+          setCalendarViewMode(storedMode as any);
+        }
+
+        const storedDate = window.localStorage.getItem(STORAGE_KEY_DATE);
+        if (storedDate) {
+          const date = new Date(storedDate);
+          if (!isNaN(date.getTime())) {
+            setBaseDate(date);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load calendar state', e);
+      }
+    }
+  }, []);
+
+  // Save state changes
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      try {
+        window.localStorage.setItem(STORAGE_KEY_MODE, calendarViewMode);
+      } catch (e) {
+        console.warn('Failed to save calendar view mode', e);
+      }
+    }
+  }, [calendarViewMode]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      try {
+        window.localStorage.setItem(STORAGE_KEY_DATE, baseDate.toISOString());
+      } catch (e) {
+        console.warn('Failed to save calendar base date', e);
+      }
+    }
+  }, [baseDate]);
+
   const handleEventPress = (eventId: string, originalEventId?: string, occurrenceIso?: string) => {
     // Check if this is a personal calendar event (they can't be opened in detail view)
     if (eventId.startsWith('personal-') || (originalEventId && originalEventId.startsWith('personal-'))) {
@@ -196,7 +244,7 @@ export function CalendarMonthView() {
       console.log('Personal calendar event clicked - cannot show details');
       return;
     }
-    
+
     const actualId = originalEventId || eventId;
     const canonicalId = actualId.split('::')[0];
     router.push({
@@ -239,13 +287,13 @@ export function CalendarMonthView() {
     if (!currentFamily) {
       return;
     }
-    
+
     // Only fetch months within the initial fetch range (not all buffer months)
     const fetchRange = Math.min(INITIAL_FETCH_RANGE, BUFFER_SIZE);
     for (let i = -fetchRange; i <= fetchRange; i++) {
       const monthDate = addMonths(baseDate, monthOffset + i);
       const info = getMonthInfo(monthDate);
-      const cacheKey = `month:${info.year}-${info.month}`;
+      const cacheKey = getMonthCacheKey(info.year, info.month);
       // Trigger fetch if not already cached
       eventCache.ensureEventsFetched(cacheKey, false);
     }
@@ -260,8 +308,8 @@ export function CalendarMonthView() {
       const prevMonth = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1);
       const nextMonth = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1);
 
-      const prevKey = `month:${prevMonth.getFullYear()}-${prevMonth.getMonth() + 1}`;
-      const nextKey = `month:${nextMonth.getFullYear()}-${nextMonth.getMonth() + 1}`;
+      const prevKey = getMonthCacheKey(prevMonth.getFullYear(), prevMonth.getMonth() + 1);
+      const nextKey = getMonthCacheKey(nextMonth.getFullYear(), nextMonth.getMonth() + 1);
 
       eventCache.ensureEventsFetched(prevKey, false);
       eventCache.ensureEventsFetched(nextKey, false);
@@ -272,14 +320,14 @@ export function CalendarMonthView() {
   // Generate months array (BUFFER_SIZE on each side of center)
   const monthsData = useMemo(() => {
     const months: MonthData[] = [];
-    
+
     for (let i = -BUFFER_SIZE; i <= BUFFER_SIZE; i++) {
       const monthDate = addMonths(baseDate, monthOffset + i);
       const info = getMonthInfo(monthDate);
-      const cacheKey = `month:${info.year}-${info.month}`;
+      const cacheKey = getMonthCacheKey(info.year, info.month);
       const rawEvents = eventCache.getEvents(cacheKey);
       const isLoading = eventCache.isLoading(cacheKey);
-      
+
       // Map raw events to MockEvent format
       let events: MockEvent[] = [];
       if (rawEvents.length > 0 && currentFamily) {
@@ -294,7 +342,7 @@ export function CalendarMonthView() {
         // In production, return empty array if no family
         events = [];
       }
-      
+
       // Add personal calendar events for this month
       const monthStart = new Date(info.year, info.month - 1, 1);
       const monthEnd = new Date(info.year, info.month, 0, 23, 59, 59);
@@ -305,13 +353,13 @@ export function CalendarMonthView() {
         const personalMockEvents = mapPersonalCalendarEventsToMockEvents(monthPersonalEvents);
         events = [...events, ...personalMockEvents];
       }
-      
+
       // Calculate calendar days
       const firstDay = new Date(info.year, info.month - 1, 1);
       const lastDay = new Date(info.year, info.month, 0);
       const daysInMonth = lastDay.getDate();
       const startDayOfWeek = (firstDay.getDay() + 6) % 7;
-      
+
       const calendarDays: (Date | null)[] = [];
       for (let j = 0; j < startDayOfWeek; j++) {
         calendarDays.push(null);
@@ -322,7 +370,7 @@ export function CalendarMonthView() {
       while (calendarDays.length < 42) {
         calendarDays.push(null);
       }
-      
+
       // Group events by day
       const eventsByDay: { [key: number]: MockEvent[] } = {};
       events.forEach((event) => {
@@ -332,10 +380,10 @@ export function CalendarMonthView() {
         }
         eventsByDay[day].push(event);
       });
-      
+
       months.push({ date: monthDate, info, events, calendarDays, eventsByDay, isLoading });
     }
-    
+
     return months;
   }, [baseDate, monthOffset, eventCache, currentFamily, familyMembers, settings.familyCalendarColor]);
 
@@ -364,11 +412,11 @@ export function CalendarMonthView() {
 
   const handleScroll = (event: any) => {
     if (isScrollingRef.current) return;
-    
+
     const offsetX = event.nativeEvent.contentOffset.x;
     const pageIndex = Math.round(offsetX / screenWidth);
     const newOffset = pageIndex - BUFFER_SIZE;
-    
+
     // Update displayed month
     if (newOffset !== displayedMonthOffset) {
       setDisplayedMonthOffset(newOffset);
@@ -380,7 +428,7 @@ export function CalendarMonthView() {
     const offsetX = event.nativeEvent.contentOffset.x;
     const pageIndex = Math.round(offsetX / screenWidth);
     const newOffset = pageIndex - BUFFER_SIZE;
-    
+
     // If we're near the edges, shift the base date to keep buffer centered
     if (pageIndex <= 2) {
       const shiftAmount = BUFFER_SIZE - 2;
@@ -460,10 +508,10 @@ export function CalendarMonthView() {
 
   const handleDatePress = (date: Date) => {
     // Toggle selection - if clicking the same date, deselect it
-    if (selectedDate && 
-        date.getDate() === selectedDate.getDate() &&
-        date.getMonth() === selectedDate.getMonth() &&
-        date.getFullYear() === selectedDate.getFullYear()) {
+    if (selectedDate &&
+      date.getDate() === selectedDate.getDate() &&
+      date.getMonth() === selectedDate.getMonth() &&
+      date.getFullYear() === selectedDate.getFullYear()) {
       setSelectedDate(null);
     } else {
       setSelectedDate(date);
@@ -475,9 +523,10 @@ export function CalendarMonthView() {
     key: string
   ) => {
     // Check if we have a cache entry for this month
-    const monthCacheEntry = eventCache.getCacheEntry(`month:${monthData.info.year}-${monthData.info.month}`);
+    const monthCacheKey = getMonthCacheKey(monthData.info.year, monthData.info.month);
+    const monthCacheEntry = eventCache.getCacheEntry(monthCacheKey);
     const hasMonthCacheEntry = !!monthCacheEntry;
-    
+
     return (
       <View key={key} style={styles.monthContainer}>
         {/* Only show loading overlay if we have no cache entry at all */}

@@ -1,7 +1,7 @@
-import React, { useMemo, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
-import { MockEvent } from '@/utils/mockEvents';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { MockEvent } from '@/utils/mockEvents';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface ListViewProps {
   events: MockEvent[];
@@ -20,11 +20,13 @@ export function ListView({ events, onEventPress }: ListViewProps) {
   const sortedEvents = useMemo(() => {
     return [...events].sort((a, b) => {
       // First sort by date
-      const dateCompare = a.startTime.getTime() - b.startTime.getTime();
+      const aTime = a.startTime?.getTime() || 0;
+      const bTime = b.startTime?.getTime() || 0;
+      const dateCompare = aTime - bTime;
       if (dateCompare !== 0) return dateCompare;
 
       // Then by start time
-      return a.startTime.getTime() - b.startTime.getTime();
+      return aTime - bTime;
     });
   }, [events]);
 
@@ -33,6 +35,7 @@ export function ListView({ events, onEventPress }: ListViewProps) {
     const groups: { [key: string]: MockEvent[] } = {};
 
     sortedEvents.forEach(event => {
+      if (!event.startTime) return;
       const dateKey = event.startTime.toDateString();
       if (!groups[dateKey]) {
         groups[dateKey] = [];
@@ -113,7 +116,7 @@ export function ListView({ events, onEventPress }: ListViewProps) {
                   {event.title}
                 </Text>
                 <Text style={[styles.eventTime, { color: mutedText }]}>
-                  {formatTime(event.startTime)}
+                  {event.startTime ? formatTime(event.startTime) : ''}
                   {event.endTime && ` - ${formatTime(event.endTime)}`}
                 </Text>
                 {event.location && (
@@ -161,11 +164,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 8,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    boxShadow: '0px 1px 2px rgba(0,0,0,0.1)',
   },
   eventColorBar: {
     width: 4,

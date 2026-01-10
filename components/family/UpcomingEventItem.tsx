@@ -56,6 +56,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 8,
     minHeight: 50,
+    // 3D shadow effects
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
   colorBar: {
     width: 6,
@@ -66,6 +75,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
   },
   dayDate: {
     fontSize: 14,

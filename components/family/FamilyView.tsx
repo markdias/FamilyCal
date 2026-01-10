@@ -101,8 +101,8 @@ export function FamilyView() {
     // Combine all events (regular + personal calendar) and sort by start time
     // Note: Personal calendar events are already included in today/upcoming caches
     let allEvents = [
-      ...(todayEvents.length > 0 ? mapEventsToFamilyEvents(todayEvents, familyMembers, currentFamily.name, familyColor) : []),
-      ...(upcomingEvents.length > 0 ? mapEventsToFamilyEvents(upcomingEvents, familyMembers, currentFamily.name, familyColor) : []),
+      ...(todayEvents.length > 0 ? mapEventsToFamilyEvents(todayEvents, familyMembers.map(m => m.contact), currentFamily.name, familyColor) : []),
+      ...(upcomingEvents.length > 0 ? mapEventsToFamilyEvents(upcomingEvents, familyMembers.map(m => m.contact), currentFamily.name, familyColor) : []),
     ].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
 
     // Filter out events that have already ended

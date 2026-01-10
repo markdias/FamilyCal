@@ -1,4 +1,4 @@
-import { supabase, Contact } from '@/lib/supabase';
+import { Contact, supabase } from '@/lib/supabase';
 import { getNextAvailableColor } from '@/utils/colorUtils';
 
 // Get a contact by ID
@@ -14,7 +14,7 @@ export async function getContact(contactId: string): Promise<{ data: Contact | n
 
 // Get user's contact record for a specific family
 export async function getUserContactForFamily(
-  userId: string, 
+  userId: string,
   familyId: string
 ): Promise<{ data: Contact | null; error: any }> {
   // Don't use .single() - user might not have a contact in this family yet
@@ -88,7 +88,7 @@ export async function addVirtualFamilyMember(
   }
 ): Promise<{ data: Contact | null; error: any }> {
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   if (!user) {
     return { data: null, error: new Error('Not authenticated') };
   }
@@ -129,7 +129,7 @@ export async function updateContact(
   updates: Partial<Omit<Contact, 'id' | 'family_id' | 'user_id' | 'created_at' | 'updated_at'>>
 ): Promise<{ data: Contact | null; error: any }> {
   const updateData: any = {};
-  
+
   if (updates.first_name !== undefined) updateData.first_name = updates.first_name;
   if (updates.last_name !== undefined) updateData.last_name = updates.last_name;
   if (updates.email !== undefined) updateData.email = updates.email;
@@ -140,6 +140,7 @@ export async function updateContact(
   if (updates.avatar_url !== undefined) updateData.avatar_url = updates.avatar_url;
   if (updates.notes !== undefined) updateData.notes = updates.notes;
   if (updates.color !== undefined) updateData.color = updates.color;
+  if (updates.routines_enabled !== undefined) updateData.routines_enabled = updates.routines_enabled;
 
   const { data, error } = await supabase
     .from('contacts')
@@ -153,7 +154,7 @@ export async function updateContact(
 
 // Update contact color
 export async function updateContactColor(
-  contactId: string, 
+  contactId: string,
   color: string
 ): Promise<{ error: any }> {
   const { error } = await supabase

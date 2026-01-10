@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Modal, FlatList } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DEFAULT_BACKGROUND = { light: '#F5F5F7', dark: '#1E1E1E' };
 
@@ -121,7 +121,7 @@ export function CalendarHeader({ month, year, onTodayPress, onMonthPress, onDail
   const cardColor = useThemeColor({ light: '#FFFFFF', dark: '#1E1E1E' }, 'background');
 
   const backgroundColor = backgroundOverride ? backgroundOverride : defaultBackgroundColor;
-  
+
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 12), backgroundColor }]}>
       <Text style={[styles.monthTitle, { color: textColor }]}>
@@ -176,11 +176,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderWidth: 1,
     borderColor: '#d9d9d9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    boxShadow: '0px 1px 2px rgba(0,0,0,0.05)',
   },
   viewButtonContent: {
     flexDirection: 'row',
@@ -202,11 +198,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderWidth: 1,
     borderColor: '#1890ff',
-    shadowColor: '#1890ff',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    boxShadow: '0px 2px 4px rgba(24,144,255,0.1)',
   },
   todayButtonText: {
     fontSize: 14,
@@ -223,11 +215,7 @@ const styles = StyleSheet.create({
   dropdownContainer: {
     width: 120,
     borderRadius: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 8,
+    boxShadow: '0px 3px 6px rgba(0,0,0,0.1)',
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#f0f0f0',

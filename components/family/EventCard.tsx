@@ -124,6 +124,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 12,
+    boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
   },
   personName: {
     fontSize: 15,

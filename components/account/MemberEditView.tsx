@@ -1,3 +1,10 @@
+import { ColorPickerModal } from '@/components/ui/ColorPickerModal';
+import { useFamily } from '@/contexts/FamilyContext';
+import { Contact } from '@/lib/supabase';
+import { updateContact } from '@/services/contactService';
+import { MEMBER_COLORS, getContrastingTextColor } from '@/utils/colorUtils';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,14 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useFamily } from '@/contexts/FamilyContext';
-import { Contact } from '@/lib/supabase';
-import { updateContact } from '@/services/contactService';
-import { MEMBER_COLORS, getContrastingTextColor, normalizeColorForDisplay } from '@/utils/colorUtils';
-import { ColorPickerModal } from '@/components/ui/ColorPickerModal';
 
 interface MemberEditViewProps {
   contactId: string;
@@ -39,6 +39,7 @@ export function MemberEditView({ contactId }: MemberEditViewProps) {
   const [relationship, setRelationship] = useState('');
   const [selectedColor, setSelectedColor] = useState<string>(MEMBER_COLORS[0]);
   const [canDrive, setCanDrive] = useState(false);
+  const [routinesEnabled, setRoutinesEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
@@ -51,6 +52,7 @@ export function MemberEditView({ contactId }: MemberEditViewProps) {
     setRelationship(contact.relationship || '');
     setSelectedColor(contact.color || MEMBER_COLORS[0]);
     setCanDrive(contact.contact_type === 'external_driver');
+    setRoutinesEnabled(contact.routines_enabled ?? true);
   }, [contact]);
 
   const handleSave = async () => {
@@ -70,6 +72,7 @@ export function MemberEditView({ contactId }: MemberEditViewProps) {
         relationship: relationship.trim() || null,
         contact_type: canDrive ? 'external_driver' : 'family_member',
         color: selectedColor,
+        routines_enabled: routinesEnabled,
       });
 
       if (error) {
@@ -195,6 +198,21 @@ export function MemberEditView({ contactId }: MemberEditViewProps) {
             <Switch
               value={canDrive}
               onValueChange={setCanDrive}
+              trackColor={{ false: '#E5E5E7', true: '#34C759' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={styles.driverInfo}>
+              <Text style={styles.label}>Show routines</Text>
+              <Text style={styles.helperText}>Enable or disable the routines feature for this member.</Text>
+            </View>
+            <Switch
+              value={routinesEnabled}
+              onValueChange={setRoutinesEnabled}
               trackColor={{ false: '#E5E5E7', true: '#34C759' }}
               thumbColor="#FFFFFF"
             />

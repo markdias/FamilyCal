@@ -20,6 +20,7 @@
     "@react-navigation/native": "^7.1.8",
     "@supabase/supabase-js": "^2.89.0",
     "@types/lodash.debounce": "^4.0.9",
+    "antd": "^6.1.4",
     "expo": "~54.0.30",
     "expo-calendar": "~15.0.8",
     "expo-constants": "~18.0.12",

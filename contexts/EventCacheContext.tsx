@@ -26,7 +26,7 @@ interface EventCacheContextType {
   isLoading: (key: string) => boolean;
 
   // Invalidate cache entries
-  invalidateCache: (keys?: string[]) => void;
+  invalidateCache: (keys?: string[], deletedEventId?: string) => void;
 
   // Force refresh a cache key
   refreshCache: (key: string) => Promise<void>;
@@ -62,16 +62,25 @@ function deserializeCache(raw: string): { [key: string]: CacheEntry } {
   }
 }
 
+// Standardized cache key generators
+export function getMonthCacheKey(year: number, month: number): string {
+  return `month:${year}-${month.toString().padStart(2, '0')}`;
+}
+
+export function getDayCacheKey(year: number, month: number, day: number): string {
+  return `day:${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+}
+
 // Helper to determine which cache keys need invalidation based on event date
 function getCacheKeysForEvent(eventDate: Date): string[] {
   const keys: string[] = ['today', 'upcoming'];
 
   const year = eventDate.getFullYear();
-  const month = (eventDate.getMonth() + 1).toString().padStart(2, '0');
-  const day = eventDate.getDate().toString().padStart(2, '0');
+  const month = eventDate.getMonth() + 1;
+  const day = eventDate.getDate();
 
-  keys.push(`month:${year}-${month}`);
-  keys.push(`day:${year}-${month}-${day}`);
+  keys.push(getMonthCacheKey(year, month));
+  keys.push(getDayCacheKey(year, month, day));
 
   return keys;
 }
@@ -231,6 +240,7 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
     }
 
     async function loadCache() {
+      if (!currentFamily) return;
       try {
         const storageKey = getStorageKey(currentFamily.id);
         let raw: string | null = null;
@@ -287,6 +297,7 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
     }
 
     async function saveCache() {
+      if (!currentFamily) return;
       try {
         const storageKey = getStorageKey(currentFamily.id);
         // Remove isLoading from entries before saving (it's a runtime state, not persisted)
@@ -548,20 +559,38 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
   }, [cache]);
 
   // Invalidate cache entries
-  const invalidateCache = useCallback((keys?: string[]) => {
-    if (keys) {
-      // Invalidate specific keys
-      setCache(prev => {
-        const next = { ...prev };
+  const invalidateCache = useCallback((keys?: string[], deletedEventId?: string) => {
+    setCache(prev => {
+      const next = { ...prev };
+
+      if (keys) {
+        // Invalidate specific keys
         for (const key of keys) {
           delete next[key];
         }
-        return next;
-      });
-    } else {
-      // Invalidate all cache
-      setCache({});
-    }
+      } else if (!deletedEventId) {
+        // Invalidate all cache (only if no specific deletedEventId)
+        return {};
+      }
+
+      // If an event was deleted, also remove it from all other cache entries
+      // (This handles cases where the event date is unknown or it's in multiple keys)
+      if (deletedEventId) {
+        console.log(`[EventCache] Manually removing deleted event ${deletedEventId} from all cache entries`);
+        Object.keys(next).forEach(key => {
+          const entry = next[key];
+          if (entry && entry.events) {
+            const initialCount = entry.events.length;
+            entry.events = entry.events.filter(e => e.id !== deletedEventId);
+            if (entry.events.length !== initialCount) {
+              console.log(`[EventCache] Removed event from key ${key}`);
+            }
+          }
+        });
+      }
+
+      return next;
+    });
   }, []);
 
   // Force refresh a cache key
@@ -627,8 +656,12 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
               ...getCacheKeysForEvent(oldEventDate),
             ];
           } else if (payload.eventType === 'DELETE' && payload.old) {
-            const eventDate = new Date((payload.old as any).start_time);
-            keysToInvalidate = getCacheKeysForEvent(eventDate);
+            const eventDate = payload.old.start_time ? new Date((payload.old as any).start_time) : null;
+            if (eventDate) {
+              keysToInvalidate = getCacheKeysForEvent(eventDate);
+            }
+            // Always try to remove the specific ID from all cache entries
+            invalidateCache(undefined, (payload.old as any).id);
           }
 
           // Also always invalidate today and upcoming
@@ -714,7 +747,7 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
 
         return prev; // Don't modify state here
       });
-    }, intervalMs);
+    }, intervalMs) as any;
 
     return () => {
       if (refreshIntervalRef.current) {

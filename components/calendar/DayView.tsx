@@ -1,6 +1,6 @@
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEventCache } from '@/contexts/EventCacheContext';
+import { getMonthCacheKey, useEventCache } from '@/contexts/EventCacheContext';
 import { useFamily } from '@/contexts/FamilyContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Contact } from '@/lib/supabase';
@@ -61,18 +61,18 @@ function mapSupabaseEventsToFamilyEventsForCalendar(
 ): FamilyEvent[] {
   const results: FamilyEvent[] = [];
   const baseFamilyColor = familyColor || FAMILY_EVENT_COLOR;
-  
+
   for (const event of events) {
     // Get participant colors for determining event color
     const participantColors = event.participants?.map(
       (p) => p.contact?.color
     ) || [];
     const validColors = participantColors.filter((c): c is string => c !== null);
-    
+
     const allFamilyCount = familyMembers?.length || 0;
     const participantCount = event.participants?.length || 0;
     const isAllFamilyEvent = allFamilyCount > 0 && participantCount === allFamilyCount;
-    
+
     // Determine event color and gradient colors:
     // - If all family members: use family color (single color, no gradient)
     // - If multiple participants (but not all): use gradient with all participant colors
@@ -80,7 +80,7 @@ function mapSupabaseEventsToFamilyEventsForCalendar(
     // - If no participants: use default color
     let color: string;
     let gradientColors: string[] | undefined;
-    
+
     if (isAllFamilyEvent) {
       color = baseFamilyColor;
       // No gradient for all-family events
@@ -99,14 +99,14 @@ function mapSupabaseEventsToFamilyEventsForCalendar(
         baseFamilyColor
       );
     }
-    
+
     // Create ONE event per Supabase event (not per participant)
     // For person display, show all participants if multiple, or single participant name
     let personName: string;
     let participantNames: string[] | undefined;
-    
+
     let participantNameToColor: { [name: string]: string } | undefined;
-    
+
     if (event.participants && event.participants.length > 0) {
       // Extract all participant names for filtering and map them to their colors
       participantNames = event.participants
@@ -115,7 +115,7 @@ function mapSupabaseEventsToFamilyEventsForCalendar(
           return formatDisplayName(p.contact.first_name, p.contact.last_name, familyName);
         })
         .filter((name): name is string => name !== null);
-      
+
       // Create mapping of participant name to their color
       participantNameToColor = {};
       event.participants.forEach((p, index) => {
@@ -125,7 +125,7 @@ function mapSupabaseEventsToFamilyEventsForCalendar(
           participantNameToColor![name] = participantColor;
         }
       });
-      
+
       if (event.participants.length === 1) {
         personName = participantNames[0] || 'Family';
       } else if (event.participants.length > 1) {
@@ -137,7 +137,7 @@ function mapSupabaseEventsToFamilyEventsForCalendar(
     } else {
       personName = 'Family';
     }
-    
+
     results.push({
       id: event.id, // Single event ID (not per participant)
       originalEventId: event.original_event_id || event.id,
@@ -154,7 +154,7 @@ function mapSupabaseEventsToFamilyEventsForCalendar(
       isAllDay: event.is_all_day,
     });
   }
-  
+
   return results;
 }
 
@@ -216,18 +216,15 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
     return days;
   }, [baseDate]);
 
-  // Helper to get cache key for a month (matches EventCacheContext format)
-  const getMonthCacheKey = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    return `month:${year}-${month}`;
+  const getMonthCacheKeyStandard = (date: Date): string => {
+    return getMonthCacheKey(date.getFullYear(), date.getMonth() + 1);
   };
 
   // Get unique months that need to be fetched for visible days
   const visibleMonths = useMemo(() => {
     const monthsSet = new Set<string>();
     daysData.forEach(dayData => {
-      monthsSet.add(getMonthCacheKey(dayData.date));
+      monthsSet.add(getMonthCacheKeyStandard(dayData.date));
     });
     return Array.from(monthsSet);
   }, [daysData]);
@@ -265,7 +262,7 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
     if (!currentFamily?.id) {
       return;
     }
-    
+
     // Fetch all unique months that are visible - this is much more efficient
     // than fetching individual days (1-2 API calls instead of 11+)
     visibleMonths.forEach(monthKey => {
@@ -279,12 +276,12 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
   const allDayEvents = useMemo(() => {
     const familyColor = settings.familyCalendarColor || FAMILY_EVENT_COLOR;
     const familyContacts = familyMembers.map(fm => fm.contact).filter((c): c is Contact => c !== undefined);
-    
+
     // Collect all regular events from cache for visible months
     // Using month-based caching is more efficient than day-based
     const allRegularEvents: EventWithDetails[] = [];
     const seenEventIds = new Set<string>();
-    
+
     visibleMonths.forEach(monthKey => {
       const events = eventCache.getEvents(monthKey);
       // Dedupe events (in case same event appears in multiple months)
@@ -295,28 +292,28 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
         }
       });
     });
-    
+
     // Filter to only events within visible date range
     const visibleStart = new Date(daysData[0].date);
     visibleStart.setHours(0, 0, 0, 0);
     const visibleEnd = new Date(daysData[daysData.length - 1].date);
     visibleEnd.setHours(23, 59, 59, 999);
-    
+
     const filteredEvents = allRegularEvents.filter(event => {
       const eventStart = new Date(event.start_time);
       return eventStart >= visibleStart && eventStart <= visibleEnd;
     });
-    
+
     // Debug logging
     const today = new Date();
     console.log(`[DayView] Loaded ${filteredEvents.length} events for visible range (${visibleMonths.join(', ')})`);
-    
+
     // Map regular events to FamilyEvent format
     let mapped: FamilyEvent[] = [];
     if (currentFamily && filteredEvents.length > 0) {
       mapped = mapSupabaseEventsToFamilyEventsForCalendar(filteredEvents, familyContacts, currentFamily?.name, familyColor);
     }
-    
+
     // Add all personal calendar events (they're already filtered to visible date range)
     if (personalCalendarEvents.length > 0) {
       // Find the user's display name from family members if they're a family member
@@ -338,7 +335,7 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
         mapped = [...mapped, ...personalFamilyEvents];
       }
     }
-    
+
     return mapped;
   }, [daysData, visibleMonths, personalCalendarEvents, currentFamily, familyMembers, settings.familyCalendarColor, eventCache, user]);
 
@@ -348,7 +345,7 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(selectedDate);
     dayEnd.setHours(23, 59, 59, 999);
-    
+
     return allDayEvents.filter(event => {
       const eventDate = new Date(event.startTime);
       return eventDate >= dayStart && eventDate <= dayEnd;
@@ -431,11 +428,11 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
 
   const handleScroll = (event: any) => {
     if (isScrollingRef.current) return;
-    
+
     const offsetX = event.nativeEvent.contentOffset.x;
     const pageIndex = Math.round(offsetX / screenWidth);
     const newOffset = pageIndex - BUFFER_SIZE;
-    
+
     // Update displayed day
     if (newOffset !== displayedDayOffset) {
       setDisplayedDayOffset(newOffset);
@@ -447,7 +444,7 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
     const offsetX = event.nativeEvent.contentOffset.x;
     const pageIndex = Math.round(offsetX / screenWidth);
     const newOffset = pageIndex - BUFFER_SIZE;
-    
+
     // If we're near the edges, shift the base date to keep buffer centered
     if (pageIndex <= 2) {
       const shiftAmount = BUFFER_SIZE - 2;
@@ -562,7 +559,7 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
       const event = dayEvents[eventIndex];
       const newStartTime = new Date(selectedDate);
       newStartTime.setHours(hours, mins, 0, 0);
-      
+
       // Keep the same duration unless resizing
       let duration: number;
       if (newHeight) {
@@ -587,11 +584,11 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
           endTime: newEndTime,
         });
         // Refresh cache after successful update
-        eventCache.refreshCache(getMonthCacheKey(selectedDate));
+        eventCache.refreshCache(getMonthCacheKeyStandard(selectedDate));
       } catch (err) {
         console.error('Error updating event time:', err);
         // Revert on error - refresh cache
-        eventCache.refreshCache(getMonthCacheKey(selectedDate));
+        eventCache.refreshCache(getMonthCacheKeyStandard(selectedDate));
       }
     }
   };
@@ -606,16 +603,16 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
     // Convert positions to times (60px = 60 minutes, so 1px = 1 minute)
     const startMinutes = Math.round(newTop);
     const endMinutes = Math.round(newTop + newHeight);
-    
+
     const startHours = Math.floor(startMinutes / 60);
     const startMins = startMinutes % 60;
     const endHours = Math.floor(endMinutes / 60);
     const endMins = endMinutes % 60;
 
     const targetDate = eventDate || selectedDate;
-    const monthKey = getMonthCacheKey(targetDate);
+    const monthKey = getMonthCacheKeyStandard(targetDate);
     const rawEvents = eventCache.getEvents(monthKey);
-    
+
     // Map to FamilyEvent format for processing
     let eventsForDay: FamilyEvent[] = [];
     if (rawEvents.length > 0 && currentFamily) {
@@ -626,7 +623,7 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
 
     const newStartTime = new Date(targetDate);
     newStartTime.setHours(startHours, startMins, 0, 0);
-    
+
     const newEndTime = new Date(targetDate);
     newEndTime.setHours(endHours, endMins, 0, 0);
 
@@ -661,10 +658,10 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
       console.log('Personal calendar event clicked - cannot show details');
       return;
     }
-    
+
     const actualId = (originalEventId || eventId || '').split('::')[0];
     router.push({
-      pathname: `/event/${actualId}`,
+      pathname: `/event/${actualId}` as any,
       params: occurrenceIso ? { occurrence: occurrenceIso } : undefined,
     });
   };
@@ -741,7 +738,7 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
               dayDate.getFullYear() === now.getFullYear()
             );
           })();
-          
+
           // Declare variables that need to be accessed in multiple scopes
           let allDayEventsForDay: FamilyEvent[] = [];
 
@@ -788,7 +785,7 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
                     );
                   })()}
                   {(() => {
-                    const monthKey = getMonthCacheKey(dayDate);
+                    const monthKey = getMonthCacheKeyStandard(dayDate);
                     const isLoadingMonth = eventCache.isLoading(monthKey);
                     const monthCacheEntry = eventCache.getCacheEntry(monthKey);
                     const hasMonthCacheEntry = !!monthCacheEntry;
@@ -808,11 +805,11 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
                     const filteredEventsForDay = selectedFilters.size === 0
                       ? eventsForDay
                       : eventsForDay.filter((event) => {
-                          if (event.participantNames && event.participantNames.length > 0) {
-                            return event.participantNames.some(name => selectedFilters.has(name));
-                          }
-                          return selectedFilters.has(event.person);
-                        });
+                        if (event.participantNames && event.participantNames.length > 0) {
+                          return event.participantNames.some(name => selectedFilters.has(name));
+                        }
+                        return selectedFilters.has(event.person);
+                      });
 
                     // Separate all-day events from regular events
                     allDayEventsForDay = filteredEventsForDay.filter(event => event.isAllDay);
@@ -942,11 +939,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d9d9d9',
     backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    boxShadow: '0px 1px 2px rgba(0,0,0,0.05)',
   },
   filterPillInactive: {
     opacity: 0.5,
@@ -1063,11 +1056,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 12,
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
+    boxShadow: '0px 2px 3px rgba(0,0,0,0.15)',
   },
   allDayEventText: {
     color: '#ffffff',

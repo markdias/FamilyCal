@@ -1,7 +1,7 @@
-import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import 'react-native-url-polyfill/auto';
 
 // Check if we're in a browser environment (not SSR)
 const isBrowser = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -83,6 +83,7 @@ export interface Contact {
   invitation_sent: boolean;
   invitation_sent_at: string | null;
   invitation_accepted_at: string | null;
+  routines_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -216,4 +217,43 @@ export interface UserPreferences {
   upcoming_events_card_view: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface Routine {
+  id: string;
+  family_id: string;
+  contact_id: string | null;
+  title: string;
+  description: string | null;
+  icon: string | null;
+  cover_url?: string | null;
+  avatar_url?: string | null;
+  sort_order?: number;
+  day_type: 'everyday' | 'weekday' | 'weekend';
+  start_time?: string | null;
+  end_time?: string | null;
+  created_at: string;
+  updated_at: string;
+  items?: RoutineItem[];
+}
+
+export interface RoutineItem {
+  id: string;
+  routine_id: string;
+  title: string;
+  description: string | null;
+  cover_url?: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  completions?: RoutineCompletion[];
+}
+
+export interface RoutineCompletion {
+  id: string;
+  item_id: string;
+  contact_id: string;
+  completed_at: string;
+  completion_date: string;
+  created_at: string;
 }
