@@ -56,7 +56,10 @@ export default function EventDetailScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.editButton}
-          onPress={() => router.push(`/event/${eventId}/edit`)}>
+          onPress={() => router.push({
+            pathname: '/event/[id]/edit',
+            params: { id: eventId }
+          })}>
           <Text style={styles.editButtonText}>Edit</Text>
         </TouchableOpacity>
       </View>

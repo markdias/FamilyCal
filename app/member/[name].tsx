@@ -1,6 +1,5 @@
-import React from 'react';
-import { useLocalSearchParams } from 'expo-router';
 import { MemberDetailView } from '@/components/member/MemberDetailView';
+import { useLocalSearchParams } from 'expo-router';
 
 export default function MemberDetailScreen() {
   const params = useLocalSearchParams();

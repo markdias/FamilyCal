@@ -10,14 +10,11 @@
     "bundleIdentifier": "com.familycal.app",
     "newArchEnabled": true,
     "extra": {
-      "googleMapsApiKey": null
+      "googleMapsApiKey": "$EXPO_PUBLIC_GOOGLE_MAPS_API_KEY"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.familycal.app",
-      "config": {
-        "googleMapsApiKey": null
-      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "FamilyCal needs your location to help you add event locations."
       }
@@ -32,11 +29,6 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "config": {
-        "googleMaps": {
-          "apiKey": null
-        }
-      },
       "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
     },
     "web": {

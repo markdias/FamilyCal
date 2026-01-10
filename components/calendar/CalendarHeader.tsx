@@ -115,7 +115,7 @@ export function CalendarHeader({ month, year, onTodayPress, onMonthPress, onDail
   const defaultBackgroundColor = useThemeColor(DEFAULT_BACKGROUND, 'background');
   const textColor = useThemeColor({}, 'text');
   const buttonColor = useThemeColor({ light: '#8E8E93', dark: '#2C2C2E' }, 'background');
-  const activeButtonColor = useThemeColor({ light: '#007AFF', dark: '#0A84FF' }, 'tint');
+  const activeButtonColor = useThemeColor({ light: '#8E8E93', dark: '#636366' }, 'text');
   const buttonText = useThemeColor({ light: '#FFFFFF', dark: '#FFFFFF' }, 'text');
   const surfaceColor = useThemeColor({ light: '#F5F5F7', dark: '#2C2C2E' }, 'background');
   const cardColor = useThemeColor({ light: '#FFFFFF', dark: '#1E1E1E' }, 'background');

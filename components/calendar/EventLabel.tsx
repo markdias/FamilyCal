@@ -1,7 +1,8 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import DiagonalColorSplit from '@/components/ui/DiagonalColorSplit';
 import { getContrastingTextColor, normalizeColorForDisplay } from '@/utils/colorUtils';
+import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface EventLabelProps {
   title: string;
@@ -18,62 +19,60 @@ interface EventLabelProps {
   onPress?: (eventId: string, originalEventId?: string, occurrenceIso?: string) => void;
 }
 
-export function EventLabel({ 
-  title, 
-  color, 
-  gradientColors, 
-  eventId, 
-  originalEventId, 
-  startTimeIso, 
-  startTime, 
+export function EventLabel({
+  title,
+  color,
+  gradientColors,
+  eventId,
+  originalEventId,
+  startTimeIso,
+  startTime,
   endTime,
   location,
   person,
   isRecurring,
-  onPress 
+  onPress
 }: EventLabelProps) {
   const handlePress = () => {
     onPress?.(eventId, originalEventId, startTimeIso);
   };
   const displayColor = normalizeColorForDisplay(color);
-  const textColor = getContrastingTextColor(displayColor);
-  
+
   // Use gradient if multiple colors provided, otherwise use solid color
   const hasGradient = gradientColors && gradientColors.length > 1;
   const gradientColorsNormalized = gradientColors?.map(c => normalizeColorForDisplay(c)) || [];
 
+  // For multi-color events, use white text for better contrast across all colors
+  // For single-color events, use contrasting color
+  const textColor = hasGradient ? '#ffffff' : getContrastingTextColor(displayColor);
+
   const content = (
     <View style={styles.titleRow}>
-      {isRecurring && <Text style={[styles.recurringIcon, { color: textColor }]}>🔄 </Text>}
-      <Text style={[styles.text, { color: textColor }]} numberOfLines={1} ellipsizeMode="tail">
+      <Text style={[styles.text, { color: textColor, fontWeight: '500', textShadowColor: hasGradient ? 'rgba(0,0,0,0.5)' : 'transparent', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }]} numberOfLines={1} ellipsizeMode="tail">
         {title}
       </Text>
+      {isRecurring && <Ionicons name="repeat-outline" size={9} style={[styles.recurringIcon, { color: textColor }]} />}
     </View>
   );
 
-  if (hasGradient && gradientColorsNormalized.length > 1) {
-    return (
-      <TouchableOpacity
-        onPress={handlePress}
-        activeOpacity={0.7}
-        style={styles.touchable}>
-        <LinearGradient
-          colors={gradientColorsNormalized}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.container}>
-          {content}
-        </LinearGradient>
-      </TouchableOpacity>
-    );
-  }
+  // Always use DiagonalColorSplit for consistent rendering (padding, border radius, etc.)
+  // If gradientColors is not provided or empty, we use [displayColor]
+  const colorsToUse = (hasGradient && gradientColorsNormalized.length > 0)
+    ? gradientColorsNormalized
+    : [displayColor];
 
   return (
     <TouchableOpacity
-      style={[styles.touchable, styles.container, { backgroundColor: displayColor }]}
       onPress={handlePress}
-      activeOpacity={0.7}>
-      {content}
+      activeOpacity={0.7}
+      style={styles.touchable}>
+      <DiagonalColorSplit
+        colors={colorsToUse}
+        angle={45} // Angle is ignored in SVG implementation but kept for API match
+        height={Platform.OS === 'web' ? 22 : 18}
+        style={styles.container}>
+        {content}
+      </DiagonalColorSplit>
     </TouchableOpacity>
   );
 }
@@ -84,11 +83,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   container: {
-    borderRadius: 3,
-    minHeight: 18,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    justifyContent: 'center',
+    borderRadius: 6,
+    minHeight: Platform.OS === 'web' ? 22 : 18,
     width: '100%',
   },
   titleRow: {
@@ -98,12 +94,11 @@ const styles = StyleSheet.create({
   },
   recurringIcon: {
     fontSize: 9,
-    marginRight: 2,
+    marginLeft: 4,
     flexShrink: 0,
   },
   text: {
     fontSize: 11,
-    color: '#1D1D1F',
     fontWeight: '400',
     flex: 1,
     flexShrink: 1,

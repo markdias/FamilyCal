@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { FamilyEvent, formatTimeRange, getCountdownText } from '@/utils/mockEvents';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
@@ -10,6 +11,7 @@ interface UpcomingEventCardProps {
 }
 
 export function UpcomingEventCard({ event, onPress }: UpcomingEventCardProps) {
+  const router = useRouter();
   const cardColor = useThemeColor({ light: '#FFFFFF', dark: '#1E1E1E' }, 'background');
   const textColor = useThemeColor({}, 'text');
   const mutedText = useThemeColor({ light: '#8E8E93', dark: '#9EA0A6' }, 'text');
@@ -24,7 +26,7 @@ export function UpcomingEventCard({ event, onPress }: UpcomingEventCardProps) {
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  
+
   let dateDisplay = '';
   if (event.startTime.toDateString() === today.toDateString()) {
     dateDisplay = 'Today';
@@ -35,7 +37,12 @@ export function UpcomingEventCard({ event, onPress }: UpcomingEventCardProps) {
   }
 
   const handlePress = () => {
-    onPress?.(event.id, event.originalEventId, event.startTime.toISOString());
+    if (onPress) {
+      onPress(event.id, event.originalEventId, event.startTime.toISOString());
+    } else {
+      // Default behavior: navigate to member detail view
+      router.push(`/member/${encodeURIComponent(event.person)}`);
+    }
   };
 
   return (

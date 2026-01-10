@@ -6,7 +6,6 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -77,7 +76,9 @@ export default function SearchScreen() {
     }
 
     performSearch(searchQuery);
-    setIsSelectionMode(false); // Reset selection mode when searching
+    // Clear selection when search query changes
+    setSelectedEvents(new Set());
+    setIsSelectionMode(false);
   }, [searchQuery, allEvents, contacts, currentFamily]);
 
   const performSearch = useCallback((query: string) => {
@@ -145,51 +146,58 @@ export default function SearchScreen() {
       return;
     }
 
-    Alert.alert(
-      'Delete Events',
-      `Are you sure you want to delete ${selectedEvents.size} event${selectedEvents.size > 1 ? 's' : ''}? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setIsDeleting(true);
-            try {
-              // Get the original event IDs from selected search results
-              const eventIdsToDelete = Array.from(selectedEvents).map(selectedId => {
-                const searchResult = searchResults.find(result => result.id === selectedId);
-                return searchResult?.originalEvent.id;
-              }).filter(id => id != null);
-
-              const deletePromises = eventIdsToDelete.map(eventId => deleteEvent(eventId));
-
-              const results = await Promise.all(deletePromises);
-              const failedDeletes = results.filter(result => result.error);
-
-              if (failedDeletes.length > 0) {
-                Alert.alert(
-                  'Partial Success',
-                  `${selectedEvents.size - failedDeletes.length} events deleted, but ${failedDeletes.length} failed.`
-                );
-              } else {
-                Alert.alert('Success', `${selectedEvents.size} event${selectedEvents.size > 1 ? 's' : ''} deleted.`);
-              }
-
-              // Refresh events and clear selection
-              await loadAllEvents();
-              setSelectedEvents(new Set());
-
-            } catch (error) {
-              console.error('Error deleting events:', error);
-              Alert.alert('Error', 'Failed to delete events. Please try again.');
-            } finally {
-              setIsDeleting(false);
-            }
-          }
-        }
-      ]
+    // Use window.confirm for web compatibility
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${selectedEvents.size} event${selectedEvents.size > 1 ? 's' : ''}? This action cannot be undone.`
     );
+
+    if (!confirmed) {
+      return;
+    }
+
+    // Proceed with deletion
+    setIsDeleting(true);
+    try {
+      // Get the original event IDs from selected search results
+      const eventIdsToDelete = Array.from(selectedEvents).map(selectedId => {
+        const searchResult = searchResults.find(result => result.id === selectedId);
+        console.log('Finding searchResult for selectedId:', selectedId);
+        console.log('searchResult found:', !!searchResult);
+        console.log('originalEvent.id:', searchResult?.originalEvent.id);
+        return searchResult?.originalEvent.id;
+      }).filter(id => id != null);
+
+      console.log('eventIdsToDelete:', eventIdsToDelete);
+
+      const deletePromises = eventIdsToDelete.map(eventId => {
+        console.log('Calling deleteEvent for:', eventId);
+        return deleteEvent(eventId);
+      });
+
+      const results = await Promise.all(deletePromises);
+      console.log('Delete results:', results);
+
+      const failedDeletes = results.filter(result => result.error);
+      console.log('Failed deletes:', failedDeletes);
+
+      if (failedDeletes.length > 0) {
+        window.alert(
+          `Partial Success: ${selectedEvents.size - failedDeletes.length} events deleted, but ${failedDeletes.length} failed.`
+        );
+      } else {
+        window.alert(`Success: ${selectedEvents.size} event${selectedEvents.size > 1 ? 's' : ''} deleted.`);
+      }
+
+      // Refresh events and clear selection
+      await loadAllEvents();
+      setSelectedEvents(new Set());
+
+    } catch (error) {
+      console.error('Error deleting events:', error);
+      window.alert('Error: Failed to delete events. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const renderEventCard = ({ item }: { item: SearchableEvent }) => {

@@ -1,18 +1,18 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { ScrollView, StyleSheet, View, Text, ActivityIndicator, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useEventCache } from '@/contexts/EventCacheContext';
+import { useFamily } from '@/contexts/FamilyContext';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { mapEventsToFamilyEvents } from '@/services/eventService';
+import { FAMILY_EVENT_COLOR } from '@/utils/colorUtils';
+import { FamilyEvent, generateCurrentEvents, generateUpcomingEvents } from '@/utils/mockEvents';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CurrentEventsGrid } from './CurrentEventsGrid';
 import { UpcomingEventsList } from './UpcomingEventsList';
-import { useFamily } from '@/contexts/FamilyContext';
-import { useAppSettings } from '@/contexts/AppSettingsContext';
-import { useEventCache } from '@/contexts/EventCacheContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { mapEventsToFamilyEvents } from '@/services/eventService';
-import { FamilyEvent, generateCurrentEvents, generateUpcomingEvents } from '@/utils/mockEvents';
-import { useThemeColor } from '@/hooks/use-theme-color';
-import { FAMILY_EVENT_COLOR } from '@/utils/colorUtils';
 
 export function FamilyView() {
   const router = useRouter();
@@ -35,7 +35,7 @@ export function FamilyView() {
   const textColor = useThemeColor({}, 'text');
   const subTextColor = useThemeColor({ light: '#8E8E93', dark: '#9EA0A6' }, 'text');
   const emptyContainerBgColor = useThemeColor({ light: '#F5F5F7', dark: '#1C1C1E' }, 'background');
-  
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +56,7 @@ export function FamilyView() {
   const isLoadingToday = eventCache.isLoading('today');
   const isLoadingUpcoming = eventCache.isLoading('upcoming');
   const isLoading = isLoadingToday || isLoadingUpcoming;
-  
+
   // Debug logging
   useEffect(() => {
     console.log('[FamilyView] Events from cache:', {
@@ -68,7 +68,7 @@ export function FamilyView() {
       upcomingEvents: upcomingEvents.map(e => ({ id: e.id, title: e.title, start: e.start_time, participants: e.participants?.length || 0 })),
     });
   }, [todayEvents.length, upcomingEvents.length, isLoadingToday, isLoadingUpcoming]);
-  
+
   // Check if cache entries exist (even if empty)
   // If a cache entry exists, it means we've fetched before (or are currently fetching)
   // Only show spinner if we have no cache entries at all
@@ -79,7 +79,7 @@ export function FamilyView() {
   // Process events into FamilyEvent format
   const { currentEvents, processedUpcomingEvents } = useMemo(() => {
     const familyColor = settings.familyCalendarColor || FAMILY_EVENT_COLOR;
-    
+
     // Only use mock data in development when explicitly no family is loaded
     // In production, show empty arrays if no events are available
     if (!currentFamily && __DEV__) {
@@ -100,10 +100,14 @@ export function FamilyView() {
 
     // Combine all events (regular + personal calendar) and sort by start time
     // Note: Personal calendar events are already included in today/upcoming caches
-    const allEvents = [
+    let allEvents = [
       ...(todayEvents.length > 0 ? mapEventsToFamilyEvents(todayEvents, familyMembers, currentFamily.name, familyColor) : []),
       ...(upcomingEvents.length > 0 ? mapEventsToFamilyEvents(upcomingEvents, familyMembers, currentFamily.name, familyColor) : []),
     ].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+
+    // Filter out events that have already ended
+    const now = new Date();
+    allEvents = allEvents.filter(event => event.endTime > now);
 
     // Remove duplicates (events might appear in both today and upcoming)
     const seenIds = new Set<string>();
@@ -172,15 +176,26 @@ export function FamilyView() {
     // Check eventId first (it has the "personal-" prefix), not originalEventId (which is just the iOS event ID)
     if (eventId && eventId.startsWith('personal-')) {
       // Personal calendar events are read-only from iOS, so we can't show details
-      console.log('Personal calendar event clicked - cannot show details');
       return;
     }
-    
+
     // Use originalEventId if available (for expanded recurrences) and strip occurrence suffix
     const actualEventId = (originalEventId || eventId || '').split('::')[0];
+    const params: any = { id: actualEventId };
+    if (occurrenceIso) {
+      params.occurrence = occurrenceIso;
+    }
+
     router.push({
-      pathname: `/event/${actualEventId}`,
-      params: occurrenceIso ? { occurrence: occurrenceIso } : undefined,
+      pathname: '/event/[id]',
+      params,
+    });
+  };
+
+  const handleMemberPress = (person: string) => {
+    router.push({
+      pathname: '/member/[name]',
+      params: { name: person },
     });
   };
 
@@ -221,7 +236,7 @@ export function FamilyView() {
             <Text style={[styles.errorText, { color: '#FF3B30' }]}>{error}</Text>
           </View>
         )}
-        
+
         {currentEvents.length === 0 && processedUpcomingEvents.length === 0 ? (
           <View style={[styles.emptyContainer, { backgroundColor: emptyContainerBgColor }]}>
             <Text style={[styles.emptyTitle, { color: textColor }]}>No Events Yet</Text>
@@ -231,7 +246,7 @@ export function FamilyView() {
           </View>
         ) : (
           <>
-            <CurrentEventsGrid events={currentEvents} onEventPress={handleEventPress} />
+            <CurrentEventsGrid events={currentEvents} onEventPress={handleEventPress} onMemberPress={handleMemberPress} />
             <UpcomingEventsList events={processedUpcomingEvents} onEventPress={handleEventPress} />
           </>
         )}

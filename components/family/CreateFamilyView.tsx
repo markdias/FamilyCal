@@ -1,20 +1,20 @@
+import { useAuth } from '@/contexts/AuthContext';
+import { useFamily } from '@/contexts/FamilyContext';
+import { supabase } from '@/lib/supabase';
+import { getNextAvailableColor } from '@/utils/colorUtils';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  ScrollView,
-  ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
-import { useFamily } from '@/contexts/FamilyContext';
-import { supabase } from '@/lib/supabase';
-import { getNextAvailableColor } from '@/utils/colorUtils';
 
 export function CreateFamilyView() {
   const router = useRouter();
@@ -107,7 +107,7 @@ export function CreateFamilyView() {
         { name: 'Sports', color: '#CCFFE5' },
         { name: 'Work', color: '#FFE5CC' },
         { name: 'Medical', color: '#CCE5FF' },
-        { name: 'Family', color: '#FFF5CC' },
+        { name: 'Family', color: '#FFEB3B' },
       ];
 
       await supabase.from('event_categories').insert(
@@ -150,7 +150,7 @@ export function CreateFamilyView() {
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        
+
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity

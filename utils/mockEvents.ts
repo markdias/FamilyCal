@@ -16,7 +16,7 @@ export interface MockEvent {
 export const PASTEL_COLORS = {
   orange: '#FFE5CC',
   purple: '#E5CCFF',
-  yellow: '#FFF5CC',
+  yellow: '#FFEB3B',
   green: '#CCFFE5',
   blue: '#CCE5FF',
 };
@@ -28,19 +28,21 @@ export function generateMockEvents(year: number, month: number): MockEvent[] {
   let colorIndex = 0;
 
   // Helper to add event
-  const addEvent = (day: number, title: string, color?: string) => {
+  const addEvent = (day: number, title: string, color?: string, gradientColors?: string[]) => {
     events.push({
       id: `event-${year}-${month}-${day}-${events.length}`,
       title,
       color: color || colors[colorIndex % colors.length],
+      gradientColors,
       date: new Date(year, month - 1, day),
     });
-    if (!color) colorIndex++;
+    if (!color && !gradientColors) colorIndex++;
   };
 
   // December 1
   addEvent(1, 'OUT of o...', PASTEL_COLORS.orange);
   addEvent(1, 'Off Work', PASTEL_COLORS.orange);
+  addEvent(1, 'Family Meeting', undefined, [PASTEL_COLORS.purple, PASTEL_COLORS.yellow, PASTEL_COLORS.green]); // Multi-member event
   addEvent(1, 'School', PASTEL_COLORS.purple);
   addEvent(1, 'Understa...', PASTEL_COLORS.orange);
   addEvent(1, 'Monkey...', PASTEL_COLORS.orange);
@@ -52,6 +54,7 @@ export function generateMockEvents(year: number, month: number): MockEvent[] {
   addEvent(2, 'OUT of o...', PASTEL_COLORS.orange);
   addEvent(2, 'Nursery', PASTEL_COLORS.yellow);
   addEvent(2, 'School D...', PASTEL_COLORS.purple);
+  addEvent(2, 'Family Dinner', undefined, [PASTEL_COLORS.orange, PASTEL_COLORS.blue, PASTEL_COLORS.green]); // Multi-member event
   addEvent(2, 'Parent M...', PASTEL_COLORS.orange);
   addEvent(2, 'School Pi...', PASTEL_COLORS.purple);
   addEvent(2, 'going ov...', PASTEL_COLORS.orange);
@@ -61,6 +64,7 @@ export function generateMockEvents(year: number, month: number): MockEvent[] {
   addEvent(3, 'OUT of of...', PASTEL_COLORS.orange);
   addEvent(3, 'School Dr...', PASTEL_COLORS.purple);
   addEvent(3, 'School', PASTEL_COLORS.purple);
+  addEvent(3, 'Family Outing', undefined, [PASTEL_COLORS.blue, PASTEL_COLORS.purple]); // Multi-member event
   addEvent(3, 'GUTS Dis...', PASTEL_COLORS.orange);
   addEvent(3, 'Headteac...', PASTEL_COLORS.orange);
   addEvent(3, 'Lunch wit...', PASTEL_COLORS.orange);
@@ -457,20 +461,49 @@ export function generateUpcomingEvents(): FamilyEvent[] {
 // Helper function to calculate countdown
 export function getCountdownText(startTime: Date): string {
   const now = new Date();
-  const diff = startTime.getTime() - now.getTime();
+  let diff = startTime.getTime() - now.getTime();
 
   if (diff < 0) {
     return 'Started';
   }
 
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  // Time constants in milliseconds
+  const MINUTE_MS = 60 * 1000;
+  const HOUR_MS = 60 * MINUTE_MS;
+  const DAY_MS = 24 * HOUR_MS;
+  const WEEK_MS = 7 * DAY_MS;
+  // Approximation for year/month to avoid complex calendar math without libraries
+  const YEAR_MS = 365.25 * DAY_MS;
+  const MONTH_MS = YEAR_MS / 12;
 
-  if (hours > 0) {
-    return `Starts in ${hours}h ${minutes}m`;
-  } else {
-    return `Starts in ${minutes}m`;
-  }
+  const years = Math.floor(diff / YEAR_MS);
+  diff -= years * YEAR_MS;
+
+  const months = Math.floor(diff / MONTH_MS);
+  diff -= months * MONTH_MS;
+
+  const weeks = Math.floor(diff / WEEK_MS);
+  diff -= weeks * WEEK_MS;
+
+  const days = Math.floor(diff / DAY_MS);
+  diff -= days * DAY_MS;
+
+  const hours = Math.floor(diff / HOUR_MS);
+  diff -= hours * HOUR_MS;
+
+  const minutes = Math.floor(diff / MINUTE_MS);
+
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years}y`);
+  if (months > 0) parts.push(`${months}mo`);
+  if (weeks > 0) parts.push(`${weeks}w`);
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+
+  if (parts.length === 0) return 'Starts in < 1m';
+
+  return `Starts in ${parts.join(' ')}`;
 }
 
 // Helper function to format time range

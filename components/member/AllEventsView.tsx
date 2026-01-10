@@ -120,14 +120,19 @@ export function AllEventsView({ memberName }: AllEventsViewProps) {
     // Check eventId first (it has the "personal-" prefix), not originalEventId (which is just the iOS event ID)
     if (eventId && eventId.startsWith('personal-')) {
       // Personal calendar events are read-only from iOS, so we can't show details
-      console.log('Personal calendar event clicked - cannot show details');
       return;
     }
 
     const actualId = (originalEventId || eventId || '').split('::')[0];
+
+    const params: any = { id: actualId };
+    if (occurrenceIso) {
+      params.occurrence = occurrenceIso;
+    }
+
     router.push({
-      pathname: `/event/${actualId}`,
-      params: occurrenceIso ? { occurrence: occurrenceIso } : undefined,
+      pathname: '/event/[id]',
+      params,
     });
   };
 

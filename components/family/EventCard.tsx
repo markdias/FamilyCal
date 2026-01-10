@@ -1,13 +1,13 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { FamilyEvent, formatTimeRange, getCountdownText } from '@/utils/mockEvents';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { FamilyEvent, formatTimeRange, getCountdownText } from '@/utils/mockEvents';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface EventCardProps {
   event: FamilyEvent;
-  onPress?: (eventId?: string) => void;
+  onPress?: (eventId?: string, originalEventId?: string, occurrenceIso?: string) => void;
   disableNavigation?: boolean;
   isSelected?: boolean;
   accentColor?: string;
@@ -31,7 +31,7 @@ export function EventCard({ event, onPress, disableNavigation = false, isSelecte
 
   const handleCardPress = () => {
     if (onPress) {
-      onPress(event.originalEventId);
+      onPress(event.id, event.originalEventId, event.startTime.toISOString());
     } else if (!disableNavigation) {
       handlePress();
     }
@@ -65,8 +65,9 @@ export function EventCard({ event, onPress, disableNavigation = false, isSelecte
     </>
   );
 
-  // If onPress is provided or navigation is disabled, don't make the card touchable (let parent handle it)
-  if (onPress || disableNavigation) {
+  // If navigation is disabled and no custom onPress is provided, render as a View
+  // (This is common when the card is wrapped in a TouchableOpacity by the parent, e.g. in SearchScreen)
+  if (disableNavigation && !onPress) {
     return (
       <View style={[
         styles.container,

@@ -48,6 +48,8 @@ interface TimelineEvent {
   color: string;
   isFreeTime?: boolean;
   duration?: number; // in minutes
+  originalEventId?: string;
+  isRecurring?: boolean;
 }
 
 export function ScheduleView({ memberName }: ScheduleViewProps) {
@@ -240,6 +242,8 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
         color: isFreeEvent ? '#34C759' : (participant?.contact?.color || '#007AFF'),
         duration: (endTime.getTime() - startTime.getTime()) / (1000 * 60),
         isFreeTime: isFreeEvent,
+        originalEventId: event.original_event_id || event.id,
+        isRecurring: event.is_recurring,
       });
     });
 
@@ -366,8 +370,26 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
     }
   };
 
-  const handleEventPress = (eventId: string) => {
-    router.push(`/event/${eventId}`);
+  const handleEventPress = (eventId: string, originalEventId?: string, occurrenceIso?: string) => {
+    // Check if this is a personal calendar event (they can't be opened in detail view)
+    // Check eventId first (it has the "personal-" prefix), not originalEventId (which is just the iOS event ID)
+    if (eventId && eventId.startsWith('personal-')) {
+      // Personal calendar events are read-only from iOS, so we can't show details
+      return;
+    }
+
+    // Use originalEventId if available (for expanded recurrences) and strip occurrence suffix
+    const actualEventId = (originalEventId || eventId || '').split('::')[0];
+
+    const params: any = { id: actualEventId };
+    if (occurrenceIso) {
+      params.occurrence = occurrenceIso;
+    }
+
+    router.push({
+      pathname: '/event/[id]',
+      params,
+    });
   };
 
   if (preferencesLoading) {
@@ -578,7 +600,7 @@ export function ScheduleView({ memberName }: ScheduleViewProps) {
                         : 1, // Normal opacity when no timeline hover
                     },
                   ]}
-                  onPress={() => handleEventPress(event.id)}
+                  onPress={() => handleEventPress(event.id, event.originalEventId, event.startTime.toISOString())}
                   onMouseEnter={() => {
                     setHoveredEventId(event.id);
                     setHoveredTimelineId(null); // Clear timeline hover

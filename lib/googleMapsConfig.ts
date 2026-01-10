@@ -17,6 +17,7 @@ export const GOOGLE_MAPS_API_KEY =
   Constants.expoConfig?.extra?.googleMapsApiKey ||
   Constants.manifest?.extra?.googleMapsApiKey ||
   Constants.manifest2?.extra?.expoClient?.extra?.googleMapsApiKey ||
+  process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
   // API key must be configured in app.json or environment variables
   null;
 

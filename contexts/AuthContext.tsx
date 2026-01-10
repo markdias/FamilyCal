@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Session, User, AuthError } from '@supabase/supabase-js';
-import { Platform } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import { Contact, supabase } from '@/lib/supabase';
+import { AuthError, Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
-import { supabase, Contact } from '@/lib/supabase';
+import * as WebBrowser from 'expo-web-browser';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { AppState, Platform } from 'react-native';
 
 // Required for expo-web-browser to work properly with Supabase OAuth
 WebBrowser.maybeCompleteAuthSession();
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUserContact(null);
         return;
       }
-      
+
       // Get first contact or null
       setUserContact(data && data.length > 0 ? data[0] : null);
     } catch (error) {
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
-        
+
         if (initialSession?.user) {
           await fetchUserContact(initialSession.user.id);
         }
@@ -107,6 +107,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Listen for AppState changes to handle Supabase auto-refresh
+  useEffect(() => {
+    const handleAppStateChange = (state: string) => {
+      if (state === 'active') {
+        supabase.auth.startAutoRefresh();
+      } else {
+        supabase.auth.stopAutoRefresh();
+      }
+    };
+
+    const appStateListener = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      appStateListener.remove();
+    };
+  }, []);
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -118,8 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       // Get the redirect URL for the current platform
-      const redirectTo = Platform.OS === 'web' 
-        ? `${window.location.origin}/` 
+      const redirectTo = Platform.OS === 'web'
+        ? `${window.location.origin}/`
         : Linking.createURL('/');
 
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -145,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (result.type === 'success') {
           // The URL contains the OAuth tokens
           const url = result.url;
-          
+
           // Extract the session from the URL
           const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1]);
           const accessToken = params.get('access_token');
