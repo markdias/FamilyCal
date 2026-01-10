@@ -36,11 +36,11 @@ export function EventLabel({
   const handlePress = () => {
     onPress?.(eventId, originalEventId, startTimeIso);
   };
-  const displayColor = normalizeColorForDisplay(color);
+  const displayColor = color;
 
   // Use gradient if multiple colors provided, otherwise use solid color
   const hasGradient = gradientColors && gradientColors.length > 1;
-  const gradientColorsNormalized = gradientColors?.map(c => normalizeColorForDisplay(c)) || [];
+  const gradientColorsNormalized = gradientColors || [];
 
   // For multi-color events, use white text for better contrast across all colors
   // For single-color events, use contrasting color

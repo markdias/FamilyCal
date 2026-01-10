@@ -1,16 +1,16 @@
-// Member color palette aligned with iOS Calendar system colors
+// Standard RGB color palette - darker colors that don't get modified by normalizeColorForDisplay
 export const MEMBER_COLORS = [
-  '#FF3B30', // Red
-  '#FF9500', // Orange
-  '#FFCC00', // Yellow
-  '#34C759', // Green
-  '#5AC8FA', // Teal Blue
-  '#007AFF', // Blue
-  '#5856D6', // Indigo
-  '#AF52DE', // Purple
-  '#FF2D55', // Pink
-  '#A2845E', // Brown
-  '#8E8E93', // Gray
+  '#DC2626', // Red
+  '#EA580C', // Orange
+  '#CA8A04', // Yellow
+  '#16A34A', // Green
+  '#0891B2', // Teal
+  '#2563EB', // Blue
+  '#7C3AED', // Purple
+  '#C026D3', // Magenta
+  '#DB2777', // Pink
+  '#92400E', // Brown
+  '#6B7280', // Gray
 ] as const;
 
 // Special color for events with multiple family members (overridable via settings)

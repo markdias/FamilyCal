@@ -66,12 +66,12 @@ export function DraggableEvent({
     return { startTime: newStartTime, endTime: newEndTime };
   }, [currentTop, currentHeight, selectedDate]);
 
-  const displayColor = useMemo(() => normalizeColorForDisplay(event.color || '#007AFF'), [event.color]);
+  const displayColor = useMemo(() => event.color || '#2563EB', [event.color]);
   const textOnColor = useMemo(() => getContrastingTextColor(displayColor), [displayColor]);
   
   // Use gradient if multiple colors provided, otherwise use solid color
   const hasGradient = event.gradientColors && event.gradientColors.length > 1;
-  const gradientColorsNormalized = event.gradientColors?.map(c => normalizeColorForDisplay(c)) || [];
+  const gradientColorsNormalized = event.gradientColors || [];
 
   // Check if touch is in resize area
   const isInResizeArea = (evt: any, isTop: boolean) => {

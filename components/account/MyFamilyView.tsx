@@ -34,7 +34,7 @@ interface FamilyMemberItemProps {
 function FamilyMemberItem({ contact, role, isCurrentUser, onColorChange, onPress }: FamilyMemberItemProps) {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const avatarColor = normalizeColorForDisplay(contact.color || '#E5E5E7');
+  const avatarColor = contact.color || '#F3F4F6';
 
   return (
     <>
@@ -87,7 +87,7 @@ function FamilyMemberItem({ contact, role, isCurrentUser, onColorChange, onPress
                   key={color}
                   style={[
                     styles.colorOption,
-                    { backgroundColor: normalizeColorForDisplay(color) },
+                    { backgroundColor: color },
                     contact.color === color && styles.colorOptionSelected,
                   ]}
                   onPress={() => {
@@ -95,7 +95,7 @@ function FamilyMemberItem({ contact, role, isCurrentUser, onColorChange, onPress
                     setShowColorPicker(false);
                   }}>
                   {contact.color === color && (
-                    <Ionicons name="checkmark" size={20} color={getContrastingTextColor(normalizeColorForDisplay(color))} />
+                    <Ionicons name="checkmark" size={20} color={getContrastingTextColor(color)} />
                   )}
                 </TouchableOpacity>
               ))}

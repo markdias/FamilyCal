@@ -93,7 +93,7 @@ export function MemberPicker({
           {selectedContacts.length > 0 ? (
             <View style={styles.selectedPreview}>
               {selectedContacts.slice(0, 3).map((contact, index) => {
-                const dotColor = normalizeColorForDisplay(contact.color || '#8E8E93');
+                const dotColor = contact.color || '#6B7280';
                 return (
                   <View
                     key={contact.id}
@@ -139,8 +139,8 @@ export function MemberPicker({
             <TouchableOpacity
               style={styles.memberRow}
               onPress={handleSelectAll}>
-              <View style={[styles.allMembersIcon, { backgroundColor: normalizeColorForDisplay(familyColor) }]}>
-                <Ionicons name="people" size={20} color={getContrastingTextColor(normalizeColorForDisplay(familyColor))} />
+              <View style={[styles.allMembersIcon, { backgroundColor: familyColor }]}>
+                <Ionicons name="people" size={20} color={getContrastingTextColor(familyColor)} />
               </View>
               <View style={styles.memberInfo}>
                 <Text style={styles.memberName}>All Family Members</Text>
@@ -169,9 +169,9 @@ export function MemberPicker({
                   <View
                     style={[
                       styles.memberAvatar,
-                      { backgroundColor: normalizeColorForDisplay(contact.color || '#8E8E93') },
+                      { backgroundColor: contact.color || '#6B7280' },
                     ]}>
-                    <Text style={[styles.memberInitial, { color: getContrastingTextColor(normalizeColorForDisplay(contact.color || '#8E8E93')) }]}>
+                    <Text style={[styles.memberInitial, { color: getContrastingTextColor(contact.color || '#6B7280') }]}>
                       {contact.first_name.charAt(0).toUpperCase()}
                     </Text>
                   </View>
@@ -230,8 +230,8 @@ export function SelectedMembersDisplay({
       {selectedContacts.map((contact) => (
         <View
           key={contact.id}
-          style={[styles.chip, { backgroundColor: normalizeColorForDisplay(contact.color || '#E5E5E7') }]}>
-          <Text style={[styles.chipText, { color: getContrastingTextColor(normalizeColorForDisplay(contact.color || '#E5E5E7')) }]}>
+          style={[styles.chip, { backgroundColor: contact.color || '#F3F4F6' }]}>
+          <Text style={[styles.chipText, { color: getContrastingTextColor(contact.color || '#F3F4F6') }]}>
             {contact.first_name}
           </Text>
           {onRemove && (

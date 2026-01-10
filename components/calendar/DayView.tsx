@@ -123,7 +123,7 @@ function mapSupabaseEventsToFamilyEventsForCalendar(
       event.participants.forEach((p, index) => {
         if (p.contact) {
           const name = formatDisplayName(p.contact.first_name, p.contact.last_name, familyName);
-          const participantColor = normalizeColorForDisplay(p.contact.color || validColors[index] || color);
+          const participantColor = p.contact.color || validColors[index] || color;
           participantNameToColor![name] = participantColor;
         }
       });
@@ -698,7 +698,7 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
           contentContainerStyle={styles.filtersContent}>
           {people.map((person) => {
             const isSelected = selectedFilters.size === 0 || selectedFilters.has(person);
-            const personColor = normalizeColorForDisplay(personColors[person] || surfaceColor);
+            const personColor = personColors[person] || surfaceColor;
             return (
               <TouchableOpacity
                 key={person}

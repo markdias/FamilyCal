@@ -87,23 +87,21 @@ function mapSupabaseEventsToMockEvents(
     let gradientColors: string[] | undefined;
     
     if (isAllFamilyEvent) {
-      color = normalizeColorForDisplay(baseFamilyColor);
+      color = baseFamilyColor;
       // No gradient for all-family events
     } else if (validColors.length > 1) {
       // Multiple participants - create gradient from all participant colors
-      color = normalizeColorForDisplay(validColors[0]); // Fallback for backward compatibility
-      gradientColors = validColors.map(c => normalizeColorForDisplay(c));
+      color = validColors[0]; // Fallback for backward compatibility
+      gradientColors = validColors;
     } else if (validColors.length === 1) {
       // Single participant - use their color
-      color = normalizeColorForDisplay(validColors[0]);
+      color = validColors[0];
     } else {
       // No participants - use default
-      color = normalizeColorForDisplay(
-        getEventColor(
-          validColors,
-          event.category?.color,
-          baseFamilyColor
-        )
+      color = getEventColor(
+        validColors,
+        event.category?.color,
+        baseFamilyColor
       );
     }
     

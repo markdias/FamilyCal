@@ -465,7 +465,7 @@ export function EventDetailView({ eventId, occurrence }: EventDetailViewProps) {
         const contact = p.contact;
         if (!contact) return null;
         const initial = (contact.first_name || contact.last_name || '?').trim().charAt(0).toUpperCase() || '?';
-        const color = normalizeColorForDisplay(contact.color || familyColor || '#8E8E93');
+        const color = contact.color || familyColor || '#6B7280';
         return { id: contact.id, initial, color };
       })
       .filter(Boolean) as { id: string; initial: string; color: string }[];

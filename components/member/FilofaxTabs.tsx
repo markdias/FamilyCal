@@ -1,10 +1,10 @@
 import React from 'react';
-import { StyleSheet, Text, View, Pressable, Platform } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  useAnimatedStyle,
-  withTiming,
   Easing,
+  useAnimatedStyle,
   useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 
 export interface FilofaxTab {
@@ -20,19 +20,19 @@ interface FilofaxViewProps {
   children: React.ReactNode[];
 }
 
-const TAB_WIDTH = Platform.OS === 'web' ? 48 : 32;
+const TAB_WIDTH = Platform.OS === 'web' ? 48 : 24;
 const FLIP_DURATION = 500;
 
 function getPalerColor(hexColor: string): string {
   const r = parseInt(hexColor.slice(1, 3), 16);
   const g = parseInt(hexColor.slice(3, 5), 16);
   const b = parseInt(hexColor.slice(5, 7), 16);
-  
+
   const factor = 0.35;
   const newR = Math.round(r + (255 - r) * factor);
   const newG = Math.round(g + (255 - g) * factor);
   const newB = Math.round(b + (255 - b) * factor);
-  
+
   return `rgb(${newR}, ${newG}, ${newB})`;
 }
 
@@ -40,12 +40,14 @@ export function FilofaxView({ tabs, activeIndex, onTabPress, children }: Filofax
   const [flippedTabs, setFlippedTabs] = React.useState<Set<number>>(new Set());
 
   React.useEffect(() => {
-    // Update flipped tabs based on activeIndex
-    const newFlippedTabs = new Set<number>();
-    for (let i = 0; i < activeIndex; i++) {
-      newFlippedTabs.add(i);
+    // Update flipped tabs based on activeIndex (only on web)
+    if (Platform.OS === 'web') {
+      const newFlippedTabs = new Set<number>();
+      for (let i = 0; i < activeIndex; i++) {
+        newFlippedTabs.add(i);
+      }
+      setFlippedTabs(newFlippedTabs);
     }
-    setFlippedTabs(newFlippedTabs);
   }, [activeIndex]);
 
   const isWeb = Platform.OS === 'web';
@@ -74,32 +76,38 @@ export function FilofaxView({ tabs, activeIndex, onTabPress, children }: Filofax
 
       {/* Page content area */}
       <View style={[styles.pageArea, !isWeb && styles.pageAreaMobile]}>
-        {tabs.map((tab, index) => (
-          <FlippablePage
-            key={tab.id}
-            index={index}
-            totalTabs={tabs.length}
-            isFlipped={flippedTabs.has(index)}
-            onFlipComplete={() => {
-              // Tab appears on right side after page flip completes (only on web)
-              if (isWeb) {
-                setFlippedTabs(prev => new Set([...prev, index]));
-              }
-            }}
-            onFlipStart={() => {
-              // Tab disappears from left side when page flip starts (only on web)
-              if (isWeb) {
-                setFlippedTabs(prev => {
-                  const newSet = new Set(prev);
-                  newSet.delete(index);
-                  return newSet;
-                });
-              }
-            }}
-          >
-            {children[index]}
-          </FlippablePage>
-        ))}
+        {tabs.map((tab, index) => {
+          // On mobile, we don't use the flip animation logic for visibility.
+          // Instead, we simply only render the active tab's page.
+          if (!isWeb && index !== activeIndex) return null;
+
+          return (
+            <FlippablePage
+              key={tab.id}
+              index={index}
+              totalTabs={tabs.length}
+              isFlipped={flippedTabs.has(index)}
+              onFlipComplete={() => {
+                // Tab appears on right side after page flip completes (only on web)
+                if (isWeb) {
+                  setFlippedTabs(prev => new Set([...prev, index]));
+                }
+              }}
+              onFlipStart={() => {
+                // Tab disappears from left side when page flip starts (only on web)
+                if (isWeb) {
+                  setFlippedTabs(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(index);
+                    return newSet;
+                  });
+                }
+              }}
+            >
+              {children[index]}
+            </FlippablePage>
+          );
+        })}
       </View>
 
       {/* Right tabs column - only on web */}
@@ -201,16 +209,18 @@ interface FlippablePageProps {
   totalTabs: number;
   isFlipped: boolean;
   children: React.ReactNode;
+  onFlipComplete?: () => void;
+  onFlipStart?: () => void;
 }
 
-function FlippablePage({ 
-  index, 
-  totalTabs, 
+function FlippablePage({
+  index,
+  totalTabs,
   isFlipped,
-  children 
+  children
 }: FlippablePageProps) {
   const rotation = useSharedValue(isFlipped ? 180 : 0);
-  
+
   React.useEffect(() => {
     // Delay the page flip by 150ms to let tab disappear first
     setTimeout(() => {
@@ -223,7 +233,7 @@ function FlippablePage({
 
   const animatedStyle = useAnimatedStyle(() => {
     const zIndex = rotation.value > 90 ? index : (totalTabs - index + 10);
-    
+
     return {
       transform: [
         { perspective: 1200 },
@@ -232,7 +242,7 @@ function FlippablePage({
       zIndex,
     };
   });
-  
+
   const contentStyle = useAnimatedStyle(() => {
     const opacity = rotation.value > 90 ? 0 : 1;
     return { opacity };
@@ -255,6 +265,13 @@ const styles = StyleSheet.create({
   leftTabsColumn: {
     width: TAB_WIDTH,
     flexDirection: 'column',
+    ...(Platform.OS !== 'web' ? {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      zIndex: 100,
+    } : {}),
   },
   rightTabsColumn: {
     width: TAB_WIDTH,

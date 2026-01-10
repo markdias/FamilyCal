@@ -126,7 +126,7 @@ export function AccountView() {
   const userName = userContact 
     ? `${userContact.first_name}${userContact.last_name ? ' ' + userContact.last_name : ''}`
     : user?.user_metadata?.first_name || 'User';
-  const userColor = normalizeColorForDisplay(userContact?.color || '#E5E5E7');
+  const userColor = userContact?.color || '#F3F4F6';
   const familyCalendarColor = settings.familyCalendarColor || FAMILY_EVENT_COLOR;
 
   const handleSelectFamilyColor = (color: string) => {

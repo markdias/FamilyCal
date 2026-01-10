@@ -206,19 +206,18 @@ export function MemberEditView({ contactId }: MemberEditViewProps) {
           <Text style={styles.helperText}>Tap to pick a darker, high-contrast colour.</Text>
           <View style={styles.colorGrid}>
             {MEMBER_COLORS.map((color) => {
-              const displayColor = normalizeColorForDisplay(color);
               const isSelected = selectedColor === color;
               return (
                 <TouchableOpacity
                   key={color}
                   style={[
                     styles.colorSwatch,
-                    { backgroundColor: displayColor },
+                    { backgroundColor: color },
                     isSelected && styles.colorSwatchSelected,
                   ]}
                   onPress={() => setSelectedColor(color)}>
                   {isSelected && (
-                    <Ionicons name="checkmark" size={18} color={getContrastingTextColor(displayColor)} />
+                    <Ionicons name="checkmark" size={18} color={getContrastingTextColor(color)} />
                   )}
                 </TouchableOpacity>
               );
