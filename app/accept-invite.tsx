@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useFamily } from '@/contexts/FamilyContext';
+import { supabase } from '@/lib/supabase';
 import { acceptInvitation, getInvitationByToken } from '@/services/familyService';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -7,8 +8,12 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -26,6 +31,13 @@ export default function AcceptInviteScreen() {
     const [invitation, setInvitation] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
     const [isAccepting, setIsAccepting] = useState(false);
+
+    // Form state for new users
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
 
     useEffect(() => {
         if (token) {
@@ -45,6 +57,8 @@ export default function AcceptInviteScreen() {
                 throw new Error(inviteError?.message || 'Invitation not found or expired.');
             }
             setInvitation(data);
+            setFirstName(data.first_name || '');
+            setLastName(data.last_name || '');
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -53,23 +67,70 @@ export default function AcceptInviteScreen() {
     };
 
     const handleAccept = async () => {
-        if (!user) {
-            // If not logged in, redirect to signup with token
-            router.push({
-                pathname: '/signup',
-                params: { invitationToken: token }
-            });
+        // Basic validation
+        if (!firstName.trim()) {
+            Alert.alert('Error', 'Please enter your first name');
             return;
+        }
+
+        // Only require password if we need to create/update it
+        if (!user || (user && password)) {
+            if (!password || password.length < 6) {
+                Alert.alert('Error', 'Password must be at least 6 characters');
+                return;
+            }
+            if (password !== confirmPassword) {
+                Alert.alert('Error', 'Passwords do not match');
+                return;
+            }
         }
 
         setIsAccepting(true);
         try {
+            let currentUserId = user?.id;
+            let currentUserEmail = user?.email || invitation.email;
+
+            if (password) {
+                if (user) {
+                    // If already logged in (via invite redirect), just update the password
+                    const { error: updateError } = await supabase.auth.updateUser({
+                        password,
+                        data: {
+                            first_name: firstName.trim(),
+                            last_name: lastName.trim()
+                        }
+                    });
+                    if (updateError) throw updateError;
+                } else {
+                    // For new users not yet logged in
+                    const { error: signUpError } = await useAuth().signUp(
+                        invitation.email,
+                        password,
+                        firstName.trim(),
+                        lastName.trim()
+                    );
+                    if (signUpError) throw signUpError;
+
+                    // After signUp, we should have a user session
+                    const { data: { user: newUser } } = await supabase.auth.getUser();
+                    if (newUser) {
+                        currentUserId = newUser.id;
+                        currentUserEmail = newUser.email!;
+                    } else {
+                        // User might need email confirmation if they didn't use the invite link correctly
+                        setIsAccepting(false);
+                        Alert.alert('Check Email', 'Successfully created account. Please check your email to confirm before joining.');
+                        return;
+                    }
+                }
+            }
+
             const { error: acceptError } = await acceptInvitation(
                 invitation.id,
-                user.id,
-                user.email!,
-                user.user_metadata?.first_name,
-                user.user_metadata?.last_name
+                currentUserId!,
+                currentUserEmail,
+                firstName.trim(),
+                lastName.trim()
             );
 
             if (acceptError) throw acceptError;
@@ -79,7 +140,7 @@ export default function AcceptInviteScreen() {
 
             Alert.alert(
                 'Success',
-                `You have joined the ${invitation.family?.name || 'family'}.`,
+                `Welcome! You have joined the ${invitation.family?.name || 'family'}.`,
                 [{ text: 'Great!', onPress: () => router.replace('/(tabs)') }]
             );
         } catch (err: any) {
@@ -116,43 +177,127 @@ export default function AcceptInviteScreen() {
     }
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
-            <View style={styles.content}>
-                <View style={styles.iconContainer}>
-                    <Ionicons name="people-outline" size={80} color="#007AFF" />
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+        >
+            <ScrollView
+                style={[styles.container, { paddingTop: insets.top }]}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+                keyboardShouldPersistTaps="handled"
+            >
+                <View style={styles.content}>
+                    <View style={styles.iconContainer}>
+                        <Ionicons name="people-outline" size={64} color="#007AFF" />
+                    </View>
+
+                    <Text style={styles.title}>You're Invited!</Text>
+                    <Text style={styles.subtitle}>
+                        <Text style={styles.bold}>{invitation.first_name}</Text> has invited you to join the
+                        <Text style={styles.bold}> {invitation.family?.name || 'family'} </Text>
+                        calendar.
+                    </Text>
+
+                    <View style={styles.formSection}>
+                        <Text style={styles.sectionTitle}>Complete Your Account</Text>
+
+                        <View style={styles.inputWrapper}>
+                            <Text style={styles.inputLabel}>Email</Text>
+                            <View style={[styles.inputContainer, styles.disabledInput]}>
+                                <TextInput
+                                    style={styles.input}
+                                    value={invitation.email}
+                                    editable={false}
+                                />
+                            </View>
+                        </View>
+
+                        <View style={styles.nameRow}>
+                            <View style={[styles.inputWrapper, { flex: 1 }]}>
+                                <Text style={styles.inputLabel}>First Name</Text>
+                                <View style={styles.inputContainer}>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={firstName}
+                                        onChangeText={setFirstName}
+                                        placeholder="First Name"
+                                    />
+                                </View>
+                            </View>
+                            <View style={[styles.inputWrapper, { flex: 1 }]}>
+                                <Text style={styles.inputLabel}>Last Name</Text>
+                                <View style={styles.inputContainer}>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={lastName}
+                                        onChangeText={setLastName}
+                                        placeholder="Last Name"
+                                    />
+                                </View>
+                            </View>
+                        </View>
+
+                        {(!user || !user.user_metadata?.has_password) && (
+                            <>
+                                <View style={styles.inputWrapper}>
+                                    <Text style={styles.inputLabel}>{user ? 'Update Password' : 'Create Password'}</Text>
+                                    <View style={styles.inputContainer}>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={password}
+                                            onChangeText={setPassword}
+                                            secureTextEntry={!showPassword}
+                                            placeholder="Min 6 characters"
+                                        />
+                                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                                            <Ionicons
+                                                name={showPassword ? "eye-off" : "eye"}
+                                                size={20}
+                                                color="#8E8E93"
+                                            />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                <View style={styles.inputWrapper}>
+                                    <Text style={styles.inputLabel}>Confirm Password</Text>
+                                    <View style={styles.inputContainer}>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={confirmPassword}
+                                            onChangeText={setConfirmPassword}
+                                            secureTextEntry={!showPassword}
+                                            placeholder="Confirm password"
+                                        />
+                                    </View>
+                                </View>
+                            </>
+                        )}
+
+                        <TouchableOpacity
+                            style={[styles.acceptButton, isAccepting && styles.buttonDisabled]}
+                            onPress={handleAccept}
+                            disabled={isAccepting}>
+                            {isAccepting ? (
+                                <ActivityIndicator color="#FFF" />
+                            ) : (
+                                <Text style={styles.acceptButtonText}>
+                                    {user ? 'Join Family' : 'Create Account & Join'}
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+
+                        {!user && (
+                            <TouchableOpacity
+                                style={styles.loginLink}
+                                onPress={() => router.push({ pathname: '/login', params: { invitationToken: token } })}>
+                                <Text style={styles.loginLinkText}>Already have an account? Log In</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
-
-                <Text style={styles.title}>You're Invited!</Text>
-                <Text style={styles.subtitle}>
-                    {invitation.first_name} has invited you to join the
-                    <Text style={styles.bold}> {invitation.family?.name || 'family'} </Text>
-                    calendar.
-                </Text>
-
-                <View style={styles.spacer} />
-
-                <TouchableOpacity
-                    style={[styles.acceptButton, isAccepting && styles.buttonDisabled]}
-                    onPress={handleAccept}
-                    disabled={isAccepting}>
-                    {isAccepting ? (
-                        <ActivityIndicator color="#FFF" />
-                    ) : (
-                        <Text style={styles.acceptButtonText}>
-                            {user ? 'Accept Invitation' : 'Sign Up to Join'}
-                        </Text>
-                    )}
-                </TouchableOpacity>
-
-                {!user && (
-                    <TouchableOpacity
-                        style={styles.loginLink}
-                        onPress={() => router.push({ pathname: '/login', params: { invitationToken: token } })}>
-                        <Text style={styles.loginLinkText}>Already have an account? Log In</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-        </View>
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 }
 
@@ -173,48 +318,90 @@ const styles = StyleSheet.create({
         color: '#8E8E93',
     },
     content: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 32,
+        paddingHorizontal: 24,
+        paddingTop: 20,
     },
     iconContainer: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
+        width: 100,
+        height: 100,
+        borderRadius: 50,
         backgroundColor: '#E5F1FF',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 32,
+        alignSelf: 'center',
+        marginBottom: 24,
     },
     title: {
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: '700',
         color: '#1D1D1F',
-        marginBottom: 12,
+        marginBottom: 8,
         textAlign: 'center',
     },
     subtitle: {
-        fontSize: 18,
+        fontSize: 16,
         color: '#48484A',
-        lineHeight: 26,
+        lineHeight: 22,
         textAlign: 'center',
-        marginBottom: 40,
+        marginBottom: 32,
     },
     bold: {
         fontWeight: '700',
         color: '#1D1D1F',
     },
-    spacer: {
+    formSection: {
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        padding: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#1D1D1F',
+        marginBottom: 20,
+    },
+    inputWrapper: {
+        marginBottom: 16,
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#8E8E93',
+        marginBottom: 8,
+        marginLeft: 4,
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F5F7',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        height: 54,
+    },
+    disabledInput: {
+        opacity: 0.6,
+    },
+    input: {
         flex: 1,
+        fontSize: 16,
+        color: '#1D1D1F',
+    },
+    nameRow: {
+        flexDirection: 'row',
+        gap: 12,
     },
     acceptButton: {
-        width: '100%',
         backgroundColor: '#007AFF',
         borderRadius: 14,
-        paddingVertical: 18,
+        height: 56,
         alignItems: 'center',
         justifyContent: 'center',
+        marginTop: 12,
         shadowColor: '#007AFF',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
@@ -231,10 +418,10 @@ const styles = StyleSheet.create({
     },
     loginLink: {
         marginTop: 20,
-        padding: 10,
+        alignItems: 'center',
     },
     loginLinkText: {
-        fontSize: 16,
+        fontSize: 15,
         color: '#007AFF',
         fontWeight: '600',
     },

@@ -2,19 +2,19 @@ import React, { useEffect } from 'react';
 // CRITICAL: Import View FIRST before any expo-router imports
 // This ensures View is initialized before react-native-screens tries to use it
 // Prevents "Cannot access uninitialized variable" errors on web
-import { View, ActivityIndicator, StyleSheet, StatusBar as RNStatusBar, Platform } from 'react-native';
+import { Platform, StatusBar as RNStatusBar, StyleSheet, View } from 'react-native';
 
 // Import reanimated before other navigation libraries
-import 'react-native-reanimated';
+import { AppSettingsProvider } from '@/contexts/AppSettingsContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { EventCacheProvider } from '@/contexts/EventCacheContext';
+import { FamilyProvider, useFamily } from '@/contexts/FamilyContext';
+import { SelectedDateProvider } from '@/contexts/SelectedDateContext';
+import { ViewModeProvider } from '@/contexts/ViewModeContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { ViewModeProvider } from '@/contexts/ViewModeContext';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { FamilyProvider, useFamily } from '@/contexts/FamilyContext';
-import { AppSettingsProvider } from '@/contexts/AppSettingsContext';
-import { EventCacheProvider } from '@/contexts/EventCacheContext';
-import { SelectedDateProvider } from '@/contexts/SelectedDateContext';
+import 'react-native-reanimated';
 
 // Web-specific: Force View initialization before react-native-screens loads
 // This must be at module level (not in a function) to run during module evaluation
@@ -39,10 +39,13 @@ function NavigationHandler({ children }: { children: React.ReactNode }) {
     if (isAuthLoading || isFamilyLoading) return;
 
     const currentSegment = segments[0];
-    const inAuthGroup = currentSegment === 'login' || currentSegment === 'signup';
-    const inOnboardingGroup = currentSegment === 'onboarding' || 
-                              currentSegment === 'create-family' || 
-                              currentSegment === 'join-family';
+    const inAuthGroup = currentSegment === 'login' ||
+      currentSegment === 'signup' ||
+      currentSegment === 'accept-invite';
+    const inOnboardingGroup = currentSegment === 'onboarding' ||
+      currentSegment === 'create-family' ||
+      currentSegment === 'join-family' ||
+      currentSegment === 'accept-invite';
     const isIndex = currentSegment === 'index' || segments.length === 0;
 
     // Only handle redirects if not on index (let index.tsx handle initial routing)
@@ -81,6 +84,7 @@ function RootLayoutNav() {
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="signup" options={{ headerShown: false }} />
+          <Stack.Screen name="accept-invite" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="create-family" options={{ headerShown: false }} />
           <Stack.Screen name="join-family" options={{ headerShown: false }} />
