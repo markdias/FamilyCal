@@ -1,20 +1,26 @@
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { acceptInvitation, getInvitationByToken } from '@/services/familyService';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
 
-export function SignupView() {
+interface SignupViewProps {
+  invitationToken?: string;
+}
+
+export function SignupView({ invitationToken }: SignupViewProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { signUp } = useAuth();
@@ -89,7 +95,27 @@ export function SignupView() {
           ]
         );
       } else {
-        // If no email confirmation needed, navigate to onboarding
+        // If no email confirmation needed
+        if (invitationToken) {
+          try {
+            const { data: invitation } = await getInvitationByToken(invitationToken);
+            if (invitation) {
+              const { data: { user: newUser } } = await supabase.auth.getUser();
+              if (newUser) {
+                await acceptInvitation(
+                  invitation.id,
+                  newUser.id,
+                  newUser.email!,
+                  firstName.trim(),
+                  lastName.trim()
+                );
+              }
+            }
+          } catch (err) {
+            console.error('Error auto-accepting invitation:', err);
+          }
+        }
+
         router.replace('/onboarding');
       }
     } catch (err) {
@@ -114,7 +140,7 @@ export function SignupView() {
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        
+
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity

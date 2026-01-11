@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Switch,
-  Modal,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import {
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SettingItemProps {
   label: string;
@@ -252,6 +252,7 @@ export function AppSettingsView() {
           />
         </View>
 
+
         {/* Event Settings Section */}
         <Text style={[styles.sectionHeader, { color: subTextColor }]}>Event Settings</Text>
         <View style={[styles.card, { backgroundColor: cardColor }]}>
@@ -284,7 +285,7 @@ export function AppSettingsView() {
             subtitle="Events to show in spotlight view"
             value="15"
             showArrows={true}
-            onPress={() => {}}
+            onPress={() => { }}
           />
           <View style={[styles.separator, { backgroundColor: separatorColor }]} />
           <View style={styles.settingItem}>
@@ -323,7 +324,7 @@ export function AppSettingsView() {
           <SettingItem
             label="Compact view style"
             subtitle="Choose your compact event card layout"
-            onPress={() => {}}
+            onPress={() => { }}
           />
           <View style={[styles.separator, { backgroundColor: separatorColor }]} />
           <View style={styles.settingItem}>
@@ -346,7 +347,7 @@ export function AppSettingsView() {
             subtitle="Alert time for new events"
             value="1 hour before"
             showArrows={true}
-            onPress={() => {}}
+            onPress={() => { }}
           />
           <View style={[styles.separator, { backgroundColor: separatorColor }]} />
           <SettingItem
@@ -354,7 +355,7 @@ export function AppSettingsView() {
             subtitle="Days to look back"
             value="2 Months"
             showArrows={true}
-            onPress={() => {}}
+            onPress={() => { }}
           />
           <View style={[styles.separator, { backgroundColor: separatorColor }]} />
           <SettingItem
@@ -362,7 +363,7 @@ export function AppSettingsView() {
             subtitle="Days to look forward"
             value="1 Year"
             showArrows={true}
-            onPress={() => {}}
+            onPress={() => { }}
           />
         </View>
       </ScrollView>

@@ -31,6 +31,14 @@ export default function SettingsLayout() {
           gestureEnabled: true,
         }}
       />
+      <Stack.Screen
+        name="shared-calendars"
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+          gestureEnabled: true,
+        }}
+      />
     </Stack>
   );
 }

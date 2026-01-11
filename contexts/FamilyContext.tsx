@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Family, Contact, FamilyMember } from '@/lib/supabase';
-import { getUserFamilies, getFamilyMembers, getFamilyContacts } from '@/services/familyService';
+import { Contact, Family, FamilyMember } from '@/lib/supabase';
+import { getFamilyContacts, getFamilyMembers, getUserFamilies } from '@/services/familyService';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 
 interface FamilyMemberWithContact extends FamilyMember {
@@ -11,31 +11,31 @@ interface FamilyContextType {
   // Current family
   currentFamily: Family | null;
   setCurrentFamily: (family: Family | null) => void;
-  
+
   // All user's families
   families: Family[];
-  
+
   // Family members with contacts
   familyMembers: FamilyMemberWithContact[];
-  
+
   // All contacts (including non-members)
   contacts: Contact[];
-  
+
   // Loading states
   isLoading: boolean;
   isLoadingMembers: boolean;
-  
+
   // Refresh functions
   refreshFamilies: () => Promise<void>;
   refreshMembers: () => Promise<void>;
   refreshContacts: () => Promise<void>;
-  
+
   // Helper to check if user has a family
   hasFamily: boolean;
-  
+
   // Get a contact by ID
   getContactById: (id: string) => Contact | undefined;
-  
+
   // Get user's role in current family
   userRole: 'owner' | 'admin' | 'member' | null;
 }
@@ -44,7 +44,7 @@ const FamilyContext = createContext<FamilyContextType | undefined>(undefined);
 
 export function FamilyProvider({ children }: { children: ReactNode }) {
   const { user, userContact, isLoading: isAuthLoading } = useAuth();
-  
+
   const [currentFamily, setCurrentFamily] = useState<Family | null>(null);
   const [families, setFamilies] = useState<Family[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMemberWithContact[]>([]);
@@ -64,14 +64,14 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       const { data, error } = await getUserFamilies();
-      
+
       if (error) {
         console.error('Error fetching families:', error);
         setFamilies([]);
         setCurrentFamily(null);
       } else if (data) {
         setFamilies(data);
-        
+
         // Auto-select first family if none selected
         if (!currentFamily && data.length > 0) {
           setCurrentFamily(data[0]);
@@ -100,7 +100,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     setIsLoadingMembers(true);
     try {
       const { data, error } = await getFamilyMembers(currentFamily.id);
-      
+
       if (error) {
         console.error('Error fetching family members:', error);
         setFamilyMembers([]);
@@ -123,7 +123,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
 
     try {
       const { data, error } = await getFamilyContacts(currentFamily.id);
-      
+
       if (error) {
         console.error('Error fetching contacts:', error);
         setContacts([]);
@@ -157,14 +157,24 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
 
   // Get user's role in current family
   const userRole = React.useMemo(() => {
-    if (!userContact || !currentFamily) return null;
-    
+    if (!currentFamily || (!userContact && !user)) return null;
+
+    const userId = userContact?.user_id || user?.id;
+    if (!userId) return null;
+
     const membership = familyMembers.find(
-      m => m.contact.user_id === userContact.user_id
+      m => m.contact.user_id === userId
     );
-    
+
+    console.log('[FamilyContext] userRole calculation:', {
+      userId,
+      membershipFound: !!membership,
+      role: membership?.role || null,
+      familyMembersCount: familyMembers.length
+    });
+
     return membership?.role || null;
-  }, [userContact, familyMembers, currentFamily]);
+  }, [user, userContact, familyMembers, currentFamily]);
 
   const hasFamily = families.length > 0;
 

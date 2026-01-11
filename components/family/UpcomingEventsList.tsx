@@ -1,19 +1,20 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { UpcomingEventItem } from './UpcomingEventItem';
-import { UpcomingEventCard } from './UpcomingEventCard';
-import { FamilyEvent } from '@/utils/mockEvents';
-import { useThemeColor } from '@/hooks/use-theme-color';
 import { useAuth } from '@/contexts/AuthContext';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { getUserPreferences, updateUpcomingEventsViewMode } from '@/services/userPreferencesService';
+import { FamilyEvent } from '@/utils/mockEvents';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { UpcomingEventCard } from './UpcomingEventCard';
+import { UpcomingEventItem } from './UpcomingEventItem';
 
 interface UpcomingEventsListProps {
   events: FamilyEvent[];
   onEventPress?: (eventId: string, originalEventId?: string, occurrenceIso?: string) => void;
+  onMemberPress?: (person: string) => void;
 }
 
-export function UpcomingEventsList({ events, onEventPress }: UpcomingEventsListProps) {
+export function UpcomingEventsList({ events, onEventPress, onMemberPress }: UpcomingEventsListProps) {
   const [isCardView, setIsCardView] = useState(false);
   const [isLoadingPreference, setIsLoadingPreference] = useState(true);
   const { user } = useAuth();
@@ -86,7 +87,9 @@ export function UpcomingEventsList({ events, onEventPress }: UpcomingEventsListP
           // Card view: events grouped by person with card-style layout
           people.map((person) => (
             <View key={person} style={styles.personSection}>
-              <Text style={[styles.personName, { color: textColor }]}>{person}</Text>
+              <TouchableOpacity onPress={() => onMemberPress?.(person)}>
+                <Text style={[styles.personName, { color: textColor }]}>{person}</Text>
+              </TouchableOpacity>
               {sortedEventsByPerson[person].map((event) => (
                 <UpcomingEventCard key={event.id} event={event} onPress={onEventPress} />
               ))}
@@ -96,7 +99,9 @@ export function UpcomingEventsList({ events, onEventPress }: UpcomingEventsListP
           // Grouped view: events grouped by person with compact layout
           people.map((person) => (
             <View key={person} style={styles.personSection}>
-              <Text style={[styles.personName, { color: textColor }]}>{person}</Text>
+              <TouchableOpacity onPress={() => onMemberPress?.(person)}>
+                <Text style={[styles.personName, { color: textColor }]}>{person}</Text>
+              </TouchableOpacity>
               {eventsByPerson[person].map((event) => (
                 <UpcomingEventItem key={event.id} event={event} onPress={onEventPress} />
               ))}

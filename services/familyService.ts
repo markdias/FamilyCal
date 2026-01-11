@@ -1,4 +1,4 @@
-import { supabase, Family, FamilyMember, Contact, FamilyInvitation } from '@/lib/supabase';
+import { Contact, Family, FamilyInvitation, FamilyMember, supabase } from '@/lib/supabase';
 
 export interface FamilyWithMembers extends Family {
   members: (FamilyMember & { contact: Contact })[];
@@ -7,7 +7,7 @@ export interface FamilyWithMembers extends Family {
 // Get all families the current user belongs to
 export async function getUserFamilies(): Promise<{ data: Family[] | null; error: any }> {
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   if (!user) {
     return { data: null, error: new Error('Not authenticated') };
   }
@@ -52,9 +52,9 @@ export async function getFamily(familyId: string): Promise<{ data: Family | null
 }
 
 // Get all members of a family with their contact information
-export async function getFamilyMembers(familyId: string): Promise<{ 
-  data: (FamilyMember & { contact: Contact })[] | null; 
-  error: any 
+export async function getFamilyMembers(familyId: string): Promise<{
+  data: (FamilyMember & { contact: Contact })[] | null;
+  error: any
 }> {
   const { data, error } = await supabase
     .from('family_members')
@@ -68,9 +68,9 @@ export async function getFamilyMembers(familyId: string): Promise<{
 }
 
 // Get all contacts for a family (including non-members like external drivers)
-export async function getFamilyContacts(familyId: string): Promise<{ 
-  data: Contact[] | null; 
-  error: any 
+export async function getFamilyContacts(familyId: string): Promise<{
+  data: Contact[] | null;
+  error: any
 }> {
   const { data, error } = await supabase
     .from('contacts')
@@ -83,7 +83,7 @@ export async function getFamilyContacts(familyId: string): Promise<{
 
 // Update family name
 export async function updateFamily(
-  familyId: string, 
+  familyId: string,
   updates: Partial<Pick<Family, 'name' | 'family_name'>>
 ): Promise<{ data: Family | null; error: any }> {
   const { data, error } = await supabase
@@ -121,7 +121,7 @@ export async function createInvitation(
   message?: string
 ): Promise<{ data: FamilyInvitation | null; error: any }> {
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   if (!user) {
     return { data: null, error: new Error('Not authenticated') };
   }
@@ -155,7 +155,7 @@ export async function cancelInvitation(invitationId: string): Promise<{ error: a
 
 // Remove a member from a family
 export async function removeFamilyMember(
-  familyId: string, 
+  familyId: string,
   contactId: string
 ): Promise<{ error: any }> {
   const { error } = await supabase
@@ -180,4 +180,103 @@ export async function updateMemberRole(
     .eq('contact_id', contactId);
 
   return { error };
+}
+
+// Get an invitation by token
+export async function getInvitationByToken(token: string): Promise<{ data: (FamilyInvitation & { family: Family }) | null; error: any }> {
+  const { data, error } = await supabase
+    .from('family_invitations')
+    .select('*, family:families(*)')
+    .eq('invitation_token', token)
+    .eq('status', 'pending')
+    .gt('expires_at', new Date().toISOString())
+    .single();
+
+  return { data: data as any, error };
+}
+
+// Accept an invitation
+export async function acceptInvitation(
+  invitationId: string,
+  userId: string,
+  email: string,
+  firstName?: string,
+  lastName?: string
+): Promise<{ error: any }> {
+  try {
+    // 1. Get invitation details
+    const { data: invitation, error: inviteError } = await supabase
+      .from('family_invitations')
+      .select('*')
+      .eq('id', invitationId)
+      .single();
+
+    if (inviteError || !invitation) {
+      throw inviteError || new Error('Invitation not found');
+    }
+
+    // 2. Check for existing contact to update or create new one
+    let contactId = invitation.contact_id;
+
+    if (contactId) {
+      // Update existing virtual contact
+      const { error: updateError } = await supabase
+        .from('contacts')
+        .update({
+          user_id: userId,
+          is_virtual: false,
+          email: email,
+          invitation_accepted_at: new Date().toISOString(),
+        })
+        .eq('id', contactId);
+
+      if (updateError) throw updateError;
+    } else {
+      // Create new contact
+      const { data: newContact, error: contactError } = await supabase
+        .from('contacts')
+        .insert({
+          family_id: invitation.family_id,
+          user_id: userId,
+          first_name: firstName || invitation.first_name || 'Member',
+          last_name: lastName || invitation.last_name || '',
+          email: email,
+          contact_type: 'family_member',
+          is_virtual: false,
+          invitation_accepted_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (contactError) throw contactError;
+      contactId = newContact.id;
+    }
+
+    // 3. Add to family_members
+    const { error: memberError } = await supabase
+      .from('family_members')
+      .insert({
+        family_id: invitation.family_id,
+        contact_id: contactId,
+        role: invitation.role || 'member',
+        added_by: invitation.invited_by,
+      });
+
+    if (memberError) throw memberError;
+
+    // 4. Update invitation status
+    const { error: finalError } = await supabase
+      .from('family_invitations')
+      .update({
+        status: 'accepted',
+        accepted_at: new Date().toISOString(),
+        accepted_by: userId,
+      })
+      .eq('id', invitationId);
+
+    return { error: finalError };
+  } catch (err) {
+    console.error('Error in acceptInvitation:', err);
+    return { error: err };
+  }
 }

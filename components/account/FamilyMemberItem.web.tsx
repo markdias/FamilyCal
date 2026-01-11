@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { TouchableOpacity, View, Text, Alert, Modal } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { Drawer, Button, Avatar, Space, Tag, Divider } from 'antd';
+import { ColorPickerModal } from '@/components/ui/ColorPickerModal';
+import { useAuth } from '@/contexts/AuthContext';
+import { useFamily } from '@/contexts/FamilyContext';
 import { Contact } from '@/lib/supabase';
 import { updateContactColor } from '@/services/contactService';
-import { useAuth } from '@/contexts/AuthContext';
-import { MEMBER_COLORS, getContrastingTextColor, normalizeColorForDisplay } from '@/utils/colorUtils';
-import { ColorPickerModal } from '@/components/ui/ColorPickerModal';
+import { createInvitation, removeFamilyMember } from '@/services/familyService';
+import { MEMBER_COLORS, getContrastingTextColor } from '@/utils/colorUtils';
+import { Ionicons } from '@expo/vector-icons';
+import { Avatar, Button, Divider, Drawer, Input, Space, Tag } from 'antd';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { Alert, Modal, Text, TouchableOpacity, View } from 'react-native';
 
 interface FamilyMemberItemProps {
   contact: Contact;
@@ -20,9 +22,15 @@ interface FamilyMemberItemProps {
 export function FamilyMemberItemWeb({ contact, role, isCurrentUser, onColorChange }: FamilyMemberItemProps) {
   const router = useRouter();
   const { user } = useAuth();
+  const { userRole, currentFamily, refreshMembers, refreshContacts } = useFamily();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Invitation state
+  const [isInviteModalVisible, setIsInviteModalVisible] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
   const avatarColor = contact.color || '#F3F4F6';
 
   const handleColorChange = async (color: string) => {
@@ -37,6 +45,41 @@ export function FamilyMemberItemWeb({ contact, role, isCurrentUser, onColorChang
     } catch (err) {
       console.error('Error updating color:', err);
       Alert.alert('Error', 'Failed to update color');
+    }
+  };
+
+  const handleSendInvite = async () => {
+    if (!inviteEmail.trim() || !inviteEmail.includes('@')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    if (!currentFamily) {
+      Alert.alert('Error', 'Family data not loaded.');
+      return;
+    }
+
+    setIsSendingInvite(true);
+    try {
+      const { error } = await createInvitation(
+        currentFamily.id,
+        inviteEmail.trim(),
+        contact.first_name,
+        contact.last_name || undefined,
+        'member',
+        `Join our family calendar on FamilyCal!`
+      );
+
+      if (error) throw error;
+
+      Alert.alert('Invitation Sent', `An invitation has been sent to ${inviteEmail}.`);
+      setIsInviteModalVisible(false);
+      setInviteEmail('');
+    } catch (err: any) {
+      console.error('Error sending invitation:', err);
+      Alert.alert('Error', err.message || 'Failed to send invitation.');
+    } finally {
+      setIsSendingInvite(false);
     }
   };
 
@@ -96,7 +139,19 @@ export function FamilyMemberItemWeb({ contact, role, isCurrentUser, onColorChang
             Change Color
           </Button>
 
-          {!isCurrentUser && (
+          {contact.is_virtual && (userRole === 'owner' || userRole === 'admin') && (
+            <Button
+              block
+              type="default"
+              icon={<Ionicons name="mail-outline" size={16} />}
+              onClick={() => setIsInviteModalVisible(true)}
+              style={{ borderColor: '#007AFF', color: '#007AFF' }}
+            >
+              Invite Member
+            </Button>
+          )}
+
+          {!isCurrentUser && (userRole === 'owner' || userRole === 'admin') && (
             <Button
               danger
               block
@@ -107,10 +162,24 @@ export function FamilyMemberItemWeb({ contact, role, isCurrentUser, onColorChang
                   `Are you sure you want to remove ${contact.first_name} from your family?`,
                   [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Remove', style: 'destructive', onPress: () => {
-                      // TODO: Implement remove member functionality
-                      setDrawerVisible(false);
-                    }}
+                    {
+                      text: 'Remove',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          if (!currentFamily) throw new Error('Family not found');
+                          const { error } = await removeFamilyMember(currentFamily.id, contact.id);
+                          if (error) throw error;
+
+                          setDrawerVisible(false);
+                          refreshMembers();
+                          refreshContacts();
+                          Alert.alert('Success', `${contact.first_name} has been removed.`);
+                        } catch (err: any) {
+                          Alert.alert('Error', err.message || 'Failed to remove member');
+                        }
+                      }
+                    }
                   ]
                 );
               }}
@@ -349,11 +418,98 @@ export function FamilyMemberItemWeb({ contact, role, isCurrentUser, onColorChang
         visible={showAdvanced}
         initialColor={contact.color || '#007AFF'}
         onClose={() => setShowAdvanced(false)}
-        onSelect={(c) => {
+        onSelect={(c: string) => {
           handleColorChange(c);
         }}
         title="Member colour"
       />
+
+      {/* Invitation Modal (Web) */}
+      <Modal
+        visible={isInviteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsInviteModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20
+          }}
+          activeOpacity={1}
+          onPress={() => setIsInviteModalVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 16,
+              padding: 24,
+              width: '100%',
+              maxWidth: 400,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.2,
+              shadowRadius: 10,
+              elevation: 5
+            }}
+          >
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#1D1D1F', marginBottom: 8 }}>
+              Invite {contact.first_name}
+            </Text>
+            <Text style={{ fontSize: 15, color: '#8E8E93', marginBottom: 20, lineHeight: 20 }}>
+              Enter an email address to send an invitation. Once they accept, they'll be able to join the family calendar.
+            </Text>
+
+            <Input
+              placeholder="Email address"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              disabled={isSendingInvite}
+              autoFocus
+              style={{ marginBottom: 20, padding: '10px 14px', borderRadius: '8px' }}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  backgroundColor: '#F5F5F7',
+                  alignItems: 'center'
+                }}
+                onPress={() => setIsInviteModalVisible(false)}
+                disabled={isSendingInvite}
+              >
+                <Text style={{ color: '#8E8E93', fontWeight: '600', fontSize: 16 }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flex: 2,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  backgroundColor: '#007AFF',
+                  alignItems: 'center',
+                  opacity: isSendingInvite ? 0.7 : 1
+                }}
+                onPress={handleSendInvite}
+                disabled={isSendingInvite}
+              >
+                {isSendingInvite ? (
+                  <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 16 }}>Sending...</Text>
+                ) : (
+                  <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 16 }}>Send Invitation</Text>
+                )
+                }
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </>
   );
 }

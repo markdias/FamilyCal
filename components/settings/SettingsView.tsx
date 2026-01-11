@@ -32,11 +32,12 @@ interface SettingsItemProps {
   icon: keyof typeof Ionicons.glyphMap;
   iconColor?: string;
   label: string;
+  description?: string;
   value?: string;
   onPress?: () => void;
 }
 
-function SettingsItem({ icon, iconColor = '#1D1D1F', label, value, onPress }: SettingsItemProps) {
+function SettingsItem({ icon, iconColor = '#1D1D1F', label, description, value, onPress }: SettingsItemProps) {
   const textColor = useThemeColor({}, 'text');
   const mutedColor = useThemeColor({ light: '#8E8E93', dark: '#9EA0A6' }, 'text');
   // Special handling for Shared Calendars icon (calendar with plus)
@@ -58,7 +59,12 @@ function SettingsItem({ icon, iconColor = '#1D1D1F', label, value, onPress }: Se
       ) : (
         <Ionicons name={icon} size={20} color={iconColor || textColor} />
       )}
-      <Text style={[styles.settingsItemText, { color: textColor }]}>{label}</Text>
+      <View style={styles.settingsItemTextContainer}>
+        <Text style={[styles.settingsItemText, { color: textColor }]}>{label}</Text>
+        {description && (
+          <Text style={[styles.settingsItemDescription, { color: mutedColor }]}>{description}</Text>
+        )}
+      </View>
       {value && (
         <Text style={[styles.settingsItemValue, { color: mutedColor }]}>{value}</Text>
       )}
@@ -203,7 +209,12 @@ export function SettingsView() {
             iconColor={textColor}
           />
           <View style={[styles.separator, { backgroundColor: separatorColor }]} />
-          <SettingsItem icon="calendar-outline" label="Shared Calendars" iconColor={textColor} />
+          <SettingsItem
+            icon="calendar-outline"
+            label="Shared Calendars"
+            onPress={() => router.push('/settings/shared-calendars')}
+            iconColor={textColor}
+          />
           <View style={[styles.separator, { backgroundColor: separatorColor }]} />
           <SettingsItem icon="color-palette-outline" label="Themes" iconColor={textColor} />
           <View style={[styles.separator, { backgroundColor: separatorColor }]} />
@@ -230,6 +241,18 @@ export function SettingsView() {
               />
             </>
           )}
+        </View>
+
+        {/* Family Section */}
+        <Text style={[styles.sectionHeader, { color: subTextColor }]}>Family</Text>
+        <View style={[styles.card, { backgroundColor: cardColor }]}>
+          <SettingsItem
+            icon="people-outline"
+            label="Join a Family"
+            onPress={() => router.push('/join-family')}
+            description="Enter a code to join an existing family"
+            iconColor={textColor}
+          />
         </View>
 
         {/* More Section */}
@@ -395,12 +418,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 12,
   },
-  settingsItemText: {
+  settingsItemTextContainer: {
     flex: 1,
+    marginLeft: 12,
+  },
+  settingsItemText: {
     fontSize: 17,
     fontWeight: '400',
     color: '#1D1D1F',
-    marginLeft: 12,
+  },
+  settingsItemDescription: {
+    fontSize: 13,
+    fontWeight: '400',
+    marginTop: 2,
   },
   separator: {
     height: 1,
