@@ -135,9 +135,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       // Get the redirect URL for the current platform
+      // For web, we use the current origin to ensure it works in development and production
       const redirectTo = Platform.OS === 'web'
-        ? `${window.location.origin}/`
+        ? window.location.origin
         : Linking.createURL('/');
+
+      console.log('[AuthContext] Google Sign-In - Redirect URL:', redirectTo);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -148,40 +151,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        console.error('Google sign-in error:', error);
+        console.error('[AuthContext] Supabase OAuth Error:', error);
         return { error };
       }
 
       // For native platforms, open the OAuth URL in the browser
       if (Platform.OS !== 'web' && data?.url) {
+        console.log('[AuthContext] Opening OAuth URL:', data.url);
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           redirectTo
         );
 
-        if (result.type === 'success') {
+        console.log('[AuthContext] WebBrowser result:', result);
+
+        if (result.type === 'success' && result.url) {
           // The URL contains the OAuth tokens
           const url = result.url;
+          console.log('[AuthContext] Success! Extracting session from URL...');
 
-          // Extract the session from the URL
-          const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1]);
+          // Extract the session from the URL - handle both fragments and query params
+          const urlParts = url.split('#');
+          const fragmentStr = urlParts.length > 1 ? urlParts[1] : '';
+          const queryStr = url.split('?')[1] || '';
+
+          const params = new URLSearchParams(fragmentStr || queryStr);
           const accessToken = params.get('access_token');
           const refreshToken = params.get('refresh_token');
 
           if (accessToken && refreshToken) {
-            // Set the session with the tokens
+            console.log('[AuthContext] Tokens found, setting session...');
             const { error: sessionError } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
             });
 
             if (sessionError) {
-              console.error('Error setting session:', sessionError);
+              console.error('[AuthContext] Error setting session:', sessionError);
               return { error: sessionError };
             }
+            console.log('[AuthContext] Session set successfully!');
+          } else {
+            console.error('[AuthContext] No tokens found in redirect URL:', url);
+            return { error: new Error('Authentication failed: missing tokens in response') };
           }
         } else if (result.type === 'cancel') {
+          console.log('[AuthContext] User cancelled Google Sign-In');
           return { error: new Error('User cancelled the authentication') };
+        } else {
+          console.error('[AuthContext] Unexpected WebBrowser result type:', result.type);
+          return { error: new Error(`Authentication failed with status: ${result.type}`) };
         }
       }
 

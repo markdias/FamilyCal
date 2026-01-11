@@ -13,6 +13,16 @@ export function CurrentEventsGrid({ events, onEventPress, onMemberPress }: Curre
   // Limit to 4 events for 2x2 grid
   const displayEvents = events.slice(0, 4);
 
+  // Track heights of each item to find the maximum
+  const [heights, setHeights] = React.useState<{ [key: string]: number }>({});
+
+  // Reset heights when events change to allow recalculation if needed
+  React.useEffect(() => {
+    setHeights({});
+  }, [events]);
+
+  const maxHeight = Math.max(0, ...Object.values(heights));
+
   return (
     <View style={styles.container}>
       <View style={styles.grid}>
@@ -31,6 +41,14 @@ export function CurrentEventsGrid({ events, onEventPress, onMemberPress }: Curre
               <EventCard
                 event={event}
                 onPress={onMemberPress || onEventPress ? handlePress : undefined}
+                containerStyle={maxHeight > 0 ? { height: maxHeight } : undefined}
+                onLayout={(e) => {
+                  const { height } = e.nativeEvent.layout;
+                  // Only update if we need to expand.
+                  if (!heights[event.id] || height > heights[event.id]) {
+                    setHeights(prev => ({ ...prev, [event.id]: height }));
+                  }
+                }}
               />
             </View>
           );

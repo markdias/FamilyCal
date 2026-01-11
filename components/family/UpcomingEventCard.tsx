@@ -1,9 +1,9 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { FamilyEvent, formatTimeRange, getCountdownText } from '@/utils/mockEvents';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { FamilyEvent, formatTimeRange, getCountdownText } from '@/utils/mockEvents';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface UpcomingEventCardProps {
   event: FamilyEvent;
@@ -58,11 +58,11 @@ export function UpcomingEventCard({ event, onPress }: UpcomingEventCardProps) {
       <View style={styles.content}>
         <View style={styles.headerRow}>
           <View style={styles.titleRow}>
-              <Text style={[styles.title, { color: textColor }]} numberOfLines={1}>
+            <Text style={[styles.title, { color: textColor }]}>
               {event.title}
             </Text>
             {event.isRecurring && (
-                <Ionicons name="refresh" size={14} color={mutedText} style={styles.recurringIcon} />
+              <Ionicons name="refresh" size={14} color={mutedText} style={styles.recurringIcon} />
             )}
           </View>
         </View>
@@ -71,7 +71,7 @@ export function UpcomingEventCard({ event, onPress }: UpcomingEventCardProps) {
         {event.location && (
           <View style={styles.locationRow}>
             <Ionicons name="paper-plane" size={12} color={mutedText} />
-            <Text style={[styles.location, { color: mutedText }]} numberOfLines={1}>
+            <Text style={[styles.location, { color: mutedText }]}>
               {event.location}
             </Text>
           </View>

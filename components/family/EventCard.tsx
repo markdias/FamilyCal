@@ -11,9 +11,19 @@ interface EventCardProps {
   disableNavigation?: boolean;
   isSelected?: boolean;
   accentColor?: string;
+  containerStyle?: any;
+  onLayout?: (event: any) => void;
 }
 
-export function EventCard({ event, onPress, disableNavigation = false, isSelected = false, accentColor }: EventCardProps) {
+export function EventCard({
+  event,
+  onPress,
+  disableNavigation = false,
+  isSelected = false,
+  accentColor,
+  containerStyle,
+  onLayout
+}: EventCardProps) {
   const router = useRouter();
   const cardColor = useThemeColor({ light: '#FFFFFF', dark: '#1E1E1E' }, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -43,7 +53,7 @@ export function EventCard({ event, onPress, disableNavigation = false, isSelecte
       <View style={styles.content}>
         <Text style={[styles.personName, { color: textColor }]}>{event.person}</Text>
         <View style={styles.titleRow}>
-          <Text style={[styles.title, { color: textColor }]} numberOfLines={1}>
+          <Text style={[styles.title, { color: textColor }]}>
             {event.title}
           </Text>
           {event.isRecurring && (
@@ -55,7 +65,7 @@ export function EventCard({ event, onPress, disableNavigation = false, isSelecte
         {event.location && (
           <View style={styles.locationRow}>
             <Ionicons name="paper-plane" size={12} color={mutedText} />
-            <Text style={[styles.location, { color: mutedText }]} numberOfLines={1}>
+            <Text style={[styles.location, { color: mutedText }]}>
               {event.location}
             </Text>
           </View>
@@ -73,8 +83,10 @@ export function EventCard({ event, onPress, disableNavigation = false, isSelecte
         styles.container,
         { backgroundColor: cardColor },
         styles.searchContainer,
-        isSelected && { borderColor: accentColor || '#007AFF', borderWidth: 2 }
-      ]}>
+        isSelected && { borderColor: accentColor || '#007AFF', borderWidth: 2 },
+        containerStyle
+      ]}
+        onLayout={onLayout}>
         <CardContent />
         {isSelected && (
           <View style={[styles.selectionIndicator, { backgroundColor: accentColor || '#007AFF' }]}>
@@ -88,8 +100,9 @@ export function EventCard({ event, onPress, disableNavigation = false, isSelecte
   // Otherwise, make it touchable for navigation
   return (
     <TouchableOpacity
-      style={[styles.container, { backgroundColor: cardColor }]}
+      style={[styles.container, { backgroundColor: cardColor }, containerStyle]}
       onPress={handleCardPress}
+      onLayout={onLayout}
       activeOpacity={0.7}>
       <CardContent />
     </TouchableOpacity>
@@ -101,9 +114,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    overflow: 'hidden',
     marginBottom: 12,
     minHeight: 140,
+    // Standard React Native shadow
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   searchContainer: {
     overflow: 'visible', // Allow selection indicators to show
@@ -120,11 +141,13 @@ const styles = StyleSheet.create({
   },
   colorBar: {
     width: 6,
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
   },
   content: {
     flex: 1,
     padding: 12,
-    boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
+    backgroundColor: 'transparent',
   },
   personName: {
     fontSize: 15,

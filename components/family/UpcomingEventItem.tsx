@@ -1,8 +1,8 @@
+import { useThemeColor } from '@/hooks/use-theme-color';
+import { FamilyEvent } from '@/utils/mockEvents';
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { FamilyEvent } from '@/utils/mockEvents';
-import { useThemeColor } from '@/hooks/use-theme-color';
 
 interface UpcomingEventItemProps {
   event: FamilyEvent;
@@ -36,7 +36,7 @@ export function UpcomingEventItem({ event, onPress }: UpcomingEventItemProps) {
           {dayAbbr} {dayNumber} {timeStr}
         </Text>
         <View style={styles.titleRow}>
-          <Text style={[styles.title, { color: textColor }]} numberOfLines={1}>
+          <Text style={[styles.title, { color: textColor }]}>
             {event.title}
           </Text>
           {event.isRecurring && (
@@ -75,7 +75,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
   },
   dayDate: {
     fontSize: 14,
