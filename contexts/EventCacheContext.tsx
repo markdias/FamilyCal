@@ -4,7 +4,7 @@ import { EventWithDetails, getEventsForDateRange, getEventsForMonth, getTodayEve
 import { getPersonalCalendarEventsForUser, PersonalCalendarEvent } from '@/services/personalCalendarService';
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { useAppSettings } from './AppSettingsContext';
 import { useAuth } from './AuthContext';
 import { useFamily } from './FamilyContext';
@@ -781,6 +781,48 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
     waitForCacheLoad();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFamily?.id]);
+
+  // Refresh data when app comes back into focus (web and native)
+  useEffect(() => {
+    if (!currentFamily) {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      // On web, refresh when document becomes visible
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        if (!document.hidden) {
+          console.log('[EventCache] App became visible on web - refreshing data');
+          // Force refresh today and upcoming events
+          fetchEventsForKey('today', true);
+          fetchEventsForKey('upcoming', true);
+        }
+      }
+    };
+
+    const handleAppStateChange = (state: string) => {
+      // On native, refresh when app becomes active
+      if (Platform.OS !== 'web' && state === 'active') {
+        console.log('[EventCache] App became active on native - refreshing data');
+        // Force refresh today and upcoming events
+        fetchEventsForKey('today', true);
+        fetchEventsForKey('upcoming', true);
+      }
+    };
+
+    // Set up listeners
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    } else {
+      const appStateListener = AppState.addEventListener('change', handleAppStateChange);
+      return () => {
+        appStateListener.remove();
+      };
+    }
+  }, [currentFamily?.id, fetchEventsForKey]);
 
   const value: EventCacheContextType = {
     getEvents,

@@ -1,6 +1,7 @@
 import { Contact, Family, FamilyMember } from '@/lib/supabase';
 import { getFamilyContacts, getFamilyMembers, getUserFamilies } from '@/services/familyService';
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { AppState, Platform } from 'react-native';
 import { useAuth } from './AuthContext';
 
 interface FamilyMemberWithContact extends FamilyMember {
@@ -149,6 +150,54 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       refreshContacts();
     }
   }, [currentFamily]);
+
+  // Refresh data when app comes back into focus (web and native)
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      // On web, refresh when document becomes visible
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        if (!document.hidden) {
+          console.log('[FamilyContext] App became visible on web - refreshing family data');
+          refreshFamilies();
+          // Also refresh members and contacts if we have a current family
+          if (currentFamily) {
+            refreshMembers();
+            refreshContacts();
+          }
+        }
+      }
+    };
+
+    const handleAppStateChange = (state: string) => {
+      // On native, refresh when app becomes active
+      if (Platform.OS !== 'web' && state === 'active') {
+        console.log('[FamilyContext] App became active on native - refreshing family data');
+        refreshFamilies();
+        // Also refresh members and contacts if we have a current family
+        if (currentFamily) {
+          refreshMembers();
+          refreshContacts();
+        }
+      }
+    };
+
+    // Set up listeners
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    } else {
+      const appStateListener = AppState.addEventListener('change', handleAppStateChange);
+      return () => {
+        appStateListener.remove();
+      };
+    }
+  }, [user, currentFamily, refreshFamilies, refreshMembers, refreshContacts]);
 
   // Get contact by ID
   const getContactById = useCallback((id: string): Contact | undefined => {

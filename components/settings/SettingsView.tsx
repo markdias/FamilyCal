@@ -3,6 +3,8 @@ import { getCalendarPermissionStatus, requestCalendarPermissions } from '@/servi
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useFamily } from '@/contexts/FamilyContext';
 import {
   Alert,
   Linking,
@@ -76,12 +78,19 @@ function SettingsItem({ icon, iconColor = '#1D1D1F', label, description, value, 
 export function SettingsView() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user, userContact } = useAuth();
+  const { hasFamily } = useFamily();
   const backgroundColor = useThemeColor({}, 'background');
   const cardColor = useThemeColor({ light: '#FFFFFF', dark: '#1E1E1E' }, 'background');
   const textColor = useThemeColor({}, 'text');
   const subTextColor = useThemeColor({ light: '#8E8E93', dark: '#9EA0A6' }, 'text');
   const separatorColor = useThemeColor({ light: '#F5F5F7', dark: '#2C2C2E' }, 'background');
   const surfaceColor = useThemeColor({ light: '#F5F5F7', dark: '#2C2C2E' }, 'background');
+
+  const userEmail = user?.email || 'Not signed in';
+  const userName = userContact 
+    ? `${userContact.first_name}${userContact.last_name ? ' ' + userContact.last_name : ''}`
+    : user?.user_metadata?.first_name || 'User';
 
   const [calendarPermissionStatus, setCalendarPermissionStatus] = useState<string>('loading');
 
@@ -135,16 +144,7 @@ export function SettingsView() {
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: cardColor }]}>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: surfaceColor }]}
-          onPress={() => {
-            // Navigation handled by tab bar
-          }}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="chevron-back" size={24} color={textColor} />
-        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: textColor }]}>Settings</Text>
-        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView
@@ -183,8 +183,8 @@ export function SettingsView() {
             <Ionicons name="person" size={24} color={textColor} />
             <View style={styles.accountTextContainer}>
               <Text style={[styles.accountSubtext, { color: subTextColor }]}>Signed in as</Text>
-              <Text style={[styles.accountName, { color: textColor }]}>Mark</Text>
-              <Text style={[styles.accountEmail, { color: subTextColor }]}>mark@mdias.co.uk</Text>
+              <Text style={[styles.accountName, { color: textColor }]}>{userName}</Text>
+              <Text style={[styles.accountEmail, { color: subTextColor }]}>{userEmail}</Text>
             </View>
             <Ionicons name="create-outline" size={20} color={subTextColor} />
           </View>
@@ -243,17 +243,21 @@ export function SettingsView() {
           )}
         </View>
 
-        {/* Family Section */}
-        <Text style={[styles.sectionHeader, { color: subTextColor }]}>Family</Text>
-        <View style={[styles.card, { backgroundColor: cardColor }]}>
-          <SettingsItem
-            icon="people-outline"
-            label="Join a Family"
-            onPress={() => router.push('/join-family')}
-            description="Enter a code to join an existing family"
-            iconColor={textColor}
-          />
-        </View>
+        {/* Family Section - Only show if user doesn't have a family */}
+        {!hasFamily && (
+          <>
+            <Text style={[styles.sectionHeader, { color: subTextColor }]}>Family</Text>
+            <View style={[styles.card, { backgroundColor: cardColor }]}>
+              <SettingsItem
+                icon="people-outline"
+                label="Join a Family"
+                onPress={() => router.push('/join-family')}
+                description="Enter a code to join an existing family"
+                iconColor={textColor}
+              />
+            </View>
+          </>
+        )}
 
         {/* More Section */}
         <Text style={[styles.sectionHeader, { color: subTextColor }]}>More</Text>
@@ -281,28 +285,17 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
   },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F5F5F7',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
     color: '#1D1D1F',
-  },
-  headerSpacer: {
-    width: 32,
   },
   scrollView: {
     flex: 1,
