@@ -311,11 +311,11 @@ export function EventCacheProvider({ children }: { children: ReactNode }) {
         }, {} as { [key: string]: CacheEntry });
         const raw = serializeCache(cacheToSave);
 
-        // Check size before saving (SecureStore has 2048 byte limit)
-        // Use string length as approximation (UTF-8 characters are typically 1-4 bytes)
-        // This is a conservative estimate - actual size may be slightly larger
+        // Check size before saving (SecureStore has around 2MB limit on iOS, smaller on Android)
+        // Use string length as approximation
         const estimatedSize = raw.length;
-        const MAX_SIZE = 1800; // Conservative limit below 2048
+        // Increase limit to 200KB to allow for more events while still being safe
+        const MAX_SIZE = 200000;
 
         if (Platform.OS === 'web') {
           window.localStorage.setItem(storageKey, raw);

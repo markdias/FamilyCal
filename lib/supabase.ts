@@ -215,6 +215,12 @@ export interface UserPreferences {
   id: string;
   user_id: string;
   upcoming_events_card_view: boolean;
+  events_per_person?: number;
+  default_screen?: 'family' | 'calendar';
+  auto_refresh_minutes?: number | null;
+  default_maps_app?: 'apple' | 'google' | 'waze';
+  appearance?: 'light' | 'dark' | 'system';
+  family_calendar_color?: string;
   created_at: string;
   updated_at: string;
 }

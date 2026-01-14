@@ -183,6 +183,12 @@ CREATE TABLE user_preferences (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     upcoming_events_card_view BOOLEAN DEFAULT FALSE,
+    events_per_person INTEGER DEFAULT 3,
+    default_screen TEXT DEFAULT 'family' CHECK (default_screen IN ('family', 'calendar')),
+    auto_refresh_minutes INTEGER,
+    default_maps_app TEXT CHECK (default_maps_app IN ('apple', 'google', 'waze')),
+    appearance TEXT DEFAULT 'system' CHECK (appearance IN ('light', 'dark', 'system')),
+    family_calendar_color TEXT DEFAULT '#334155',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_id)

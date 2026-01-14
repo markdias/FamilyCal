@@ -203,6 +203,15 @@ export function FamilyView() {
       params,
     });
   };
+
+  // Navigate directly to member detail view (for event cards)
+  const handleMemberNavigation = (person: string) => {
+    router.push({
+      pathname: '/member/[name]',
+      params: { name: person },
+    });
+  };
+
   const handleOptionExecute = async (option: string) => {
     if (!selectedContact || !currentPerson) return;
 
@@ -412,8 +421,8 @@ export function FamilyView() {
           </View>
         ) : (
           <>
-            <CurrentEventsGrid events={currentEvents} onEventPress={handleEventPress} onMemberPress={handleMemberPress} />
-            <UpcomingEventsList events={processedUpcomingEvents} onEventPress={handleEventPress} onMemberPress={handleMemberPress} />
+            <CurrentEventsGrid events={currentEvents} onEventPress={handleEventPress} onMemberPress={handleMemberNavigation} />
+            <UpcomingEventsList events={processedUpcomingEvents} onEventPress={handleEventPress} onMemberPress={handleMemberNavigation} />
           </>
         )}
       </ScrollView>

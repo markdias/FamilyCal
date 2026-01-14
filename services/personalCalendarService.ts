@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { getCalendarEvents, IOSCalendar, IOSEvent } from './calendarImportService';
+import { getCalendarEvents, IOSCalendar } from './calendarImportService';
 
 export interface PersonalCalendar {
   id: string;
@@ -167,7 +167,13 @@ export async function getPersonalCalendarEvents(
       );
 
       if (error) {
-        console.error(`Error fetching events from calendar ${calendar.calendar_title}:`, error);
+        // Check for permission errors and suppress them or handle them gracefully
+        const errorMessage = typeof error === 'string' ? error : ((error as any).message || '');
+        if (errorMessage.includes('permission is required')) {
+          console.log(`[PersonalCalendar] Permission missing for calendar ${calendar.calendar_title}, skipping silently.`);
+        } else {
+          console.error(`Error fetching events from calendar ${calendar.calendar_title}:`, error);
+        }
         continue; // Skip this calendar but continue with others
       }
 

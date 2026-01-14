@@ -82,9 +82,15 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
     const baseDate = selectedDate || new Date();
     const defaultStart = new Date(baseDate);
 
-    // If selected date is provided, set to 9 AM on that date
+    // If selected date is provided
     if (selectedDate) {
-      defaultStart.setHours(9, 0, 0, 0);
+      // If the selected date has specific time (not midnight), use it
+      if (selectedDate.getHours() !== 0 || selectedDate.getMinutes() !== 0) {
+        defaultStart.setTime(selectedDate.getTime());
+      } else {
+        // Otherwise default to 9 AM
+        defaultStart.setHours(9, 0, 0, 0);
+      }
     } else {
       // Default to next hour
       defaultStart.setHours(baseDate.getHours() + 1, 0, 0, 0);
@@ -134,8 +140,13 @@ export function AddEventView({ onAddRef }: AddEventViewProps = {}) {
       const baseDate = selectedDate || new Date();
       const newStart = new Date(baseDate);
 
-      if (selectedDate) {
-        newStart.setHours(9, 0, 0, 0);
+      if (selectedDate && !isNaN(selectedDate.getTime())) {
+        // If selected date handles time (not midnight), use it
+        if (selectedDate.getHours() !== 0 || selectedDate.getMinutes() !== 0) {
+          newStart.setTime(selectedDate.getTime());
+        } else {
+          newStart.setHours(9, 0, 0, 0);
+        }
       } else {
         newStart.setHours(baseDate.getHours() + 1, 0, 0, 0);
       }

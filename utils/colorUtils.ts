@@ -131,6 +131,15 @@ export function getContrastingTextColor(backgroundColor: string): string {
   return isLightColor(backgroundColor) ? '#1D1D1F' : '#FFFFFF';
 }
 
+// Convert hex color to rgba with opacity
+export function hexToRgba(hex: string, alpha: number): string {
+  const color = hex.replace('#', '');
+  const r = parseInt(color.substring(0, 2), 16);
+  const g = parseInt(color.substring(2, 4), 16);
+  const b = parseInt(color.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // Format display name - only show last name if different from family name
 export function formatDisplayName(
   firstName: string,
@@ -146,8 +155,8 @@ export function formatDisplayName(
 
     // Check if family name contains the last name or vice versa
     if (normalizedLastName === normalizedFamilyName ||
-        normalizedFamilyName.includes(normalizedLastName) ||
-        normalizedFamilyName.startsWith(normalizedLastName)) {
+      normalizedFamilyName.includes(normalizedLastName) ||
+      normalizedFamilyName.startsWith(normalizedLastName)) {
       return firstName;
     }
   }

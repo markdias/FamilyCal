@@ -1,3 +1,4 @@
+import { hexToRgba } from '@/utils/colorUtils';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
@@ -7,6 +8,9 @@ interface DraggableEventProps {
     initialTop: number;
     height: number;
     selectedDate: Date;
+    left?: number | string;
+    width?: number | string;
+    isPast?: boolean;
     onDragEnd: (eventId: string, newTop: number, newHeight?: number, date?: Date) => void;
     onResizeEnd: (eventId: string, newTop: number, newHeight: number, date?: Date) => void;
     onPress: (eventId: string, originalEventId?: string, occurrenceIso?: string) => void;
@@ -28,6 +32,9 @@ export function DraggableEvent({
     initialTop,
     height,
     selectedDate,
+    left,
+    width,
+    isPast = false,
     onDragEnd,
     onResizeEnd,
     onPress,
@@ -43,7 +50,18 @@ export function DraggableEvent({
 
     const displayColor = event.color || '#1890ff';
     const hasGradient = event.gradientColors && event.gradientColors.length > 1;
-    const gradientColorsNormalized = event.gradientColors || [displayColor, displayColor];
+
+    // Transparency logic
+    // Past events: 0.4 opacity
+    // Future/Current events: 0.85 opacity (slightly transparent to show overlaps)
+    const opacity = isPast ? 0.4 : 0.85;
+
+    const gradientColorsNormalized = (event.gradientColors || [displayColor, displayColor]).map(
+        (c: string) => hexToRgba(c, opacity)
+    );
+    const solidColorWithOpacity = hexToRgba(displayColor, opacity);
+
+    // Ensure text remains opaque and visible
     const textOnColor = '#FFFFFF';
 
     const [currentTimes, setCurrentTimes] = useState({
@@ -175,9 +193,12 @@ export function DraggableEvent({
             style={[
                 styles.eventBlock,
                 {
-                    backgroundColor: hasGradient ? 'transparent' : displayColor,
+                    backgroundColor: hasGradient ? 'transparent' : solidColorWithOpacity,
                     top: isDragging ? currentTop : initialTop,
                     height: currentHeight,
+                    left: (left !== undefined ? left : 4) as any,
+                    width: (width !== undefined ? width : undefined) as any,
+                    right: width !== undefined ? undefined : 4,
                     zIndex: (isDragging || isResizing) ? 100 : 1,
                 },
                 isDragging && { transform: [{ translateY: pan.y }] },

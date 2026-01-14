@@ -2,18 +2,22 @@ import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMonthCacheKey, useEventCache } from '@/contexts/EventCacheContext';
 import { useFamily } from '@/contexts/FamilyContext';
+import { useSelectedDate } from '@/contexts/SelectedDateContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Contact } from '@/lib/supabase';
 import { EventWithDetails, updateEvent } from '@/services/eventService';
 import { getPersonalCalendarEventsForUser, PersonalCalendarEvent } from '@/services/personalCalendarService';
 import { FAMILY_EVENT_COLOR, formatDisplayName, getEventColor } from '@/utils/colorUtils';
 import { FamilyEvent } from '@/utils/mockEvents';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
+  GestureResponderEvent,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -184,6 +188,7 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
   const { currentFamily, familyMembers } = useFamily();
   const { settings } = useAppSettings();
   const eventCache = useEventCache();
+  const { setSelectedDate: setGlobalSelectedDate } = useSelectedDate();
   const { user } = useAuth();
   const backgroundColor = useThemeColor({}, 'background');
   const cardColor = useThemeColor({ light: '#FFFFFF', dark: '#1E1E1E' }, 'background');
@@ -203,6 +208,17 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
   const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set());
   const [eventPositions, setEventPositions] = useState<{ [eventId: string]: number }>({});
   const [personalCalendarEvents, setPersonalCalendarEvents] = useState<PersonalCalendarEvent[]>([]);
+
+  // Double tap state
+  const lastPressRef = useRef<number>(0);
+  const [tempEvent, setTempEvent] = useState<FamilyEvent | null>(null);
+
+  // Clear temp event when screen comes into focus (e.g. back from Add screen)
+  useFocusEffect(
+    useCallback(() => {
+      setTempEvent(null);
+    }, [])
+  );
 
   // Generate days array (BUFFER_SIZE on each side of center)
   // Must be defined before useEffect that uses it
@@ -506,8 +522,65 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
     return date.toLocaleDateString('en-GB', options);
   };
 
+
   const monthName = MONTH_NAMES[selectedDate.getMonth()];
   const year = selectedDate.getFullYear();
+
+  const handleBackgroundPress = (evt: GestureResponderEvent, date: Date) => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 500;
+
+    console.log('[DayView] Tap detected. Time since last:', now - lastPressRef.current);
+
+    if (now - lastPressRef.current < DOUBLE_TAP_DELAY) {
+      // Double tap detected
+      const { locationY } = evt.nativeEvent;
+
+      if (typeof locationY === 'number' && !isNaN(locationY)) {
+        // Calculate time from Y coordinate (60px = 60 mins)
+        const totalMinutes = Math.round(locationY);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+
+        // Round to nearest 15 minutes
+        const roundedMinutes = Math.round(minutes / 15) * 15;
+
+        const newEventDate = new Date(date);
+        if (!isNaN(newEventDate.getTime())) {
+          newEventDate.setHours(hours, roundedMinutes, 0, 0);
+
+          // Only proceed if date is valid
+          if (!isNaN(newEventDate.getTime())) {
+            // Create temporary event for animation
+            const tempEndDate = new Date(newEventDate);
+            tempEndDate.setHours(tempEndDate.getHours() + 1);
+
+            const temp: FamilyEvent = {
+              id: 'temp-new-event',
+              originalEventId: 'temp',
+              person: 'New Event',
+              title: 'New Event',
+              startTime: newEventDate,
+              endTime: tempEndDate,
+              color: settings.familyCalendarColor || FAMILY_EVENT_COLOR,
+              isRecurring: false,
+              isAllDay: false,
+            };
+
+            setTempEvent(temp);
+
+            // Set selected date in context and navigate to add screen after delay
+            setTimeout(() => {
+              setGlobalSelectedDate(newEventDate);
+              router.push('/add');
+            }, 500); // 500ms delay to show the event "pop up"
+          }
+        }
+      }
+    }
+
+    lastPressRef.current = now;
+  };
 
   // Calculate event positions for a specific date
   const getEventPosition = (event: FamilyEvent, date: Date) => {
@@ -770,7 +843,9 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
                 </View>
 
                 {/* Events area */}
-                <View style={styles.eventsArea}>
+                <Pressable
+                  style={styles.eventsArea}
+                  onPress={(e) => handleBackgroundPress(e, dayDate)}>
                   {/* Current time indicator */}
                   {isTodayDay && (() => {
                     const now = new Date();
@@ -813,7 +888,16 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
 
                     // Separate all-day events from regular events
                     allDayEventsForDay = filteredEventsForDay.filter(event => event.isAllDay);
-                    const regularEventsForDay = filteredEventsForDay.filter(event => !event.isAllDay);
+                    let regularEventsForDay = filteredEventsForDay.filter(event => !event.isAllDay);
+
+                    // Add temp event if it exists and matches this day
+                    if (tempEvent) {
+                      const tempStart = new Date(tempEvent.startTime);
+                      // Check if temp event matches this day (ignoring time)
+                      if (tempStart >= dayStart && tempStart <= dayEnd) {
+                        regularEventsForDay = [...regularEventsForDay, tempEvent];
+                      }
+                    }
 
                     // Only show loading indicator if we have no cache entry at all
                     // Once cache entry exists, show the events area (even if empty)
@@ -848,31 +932,44 @@ export function DayView({ onTodayPress, onMonthPress, onDailyPress, onListPress,
                         )}
 
                         {/* Regular events on timeline */}
-                        {regularEventsForDay.length > 0 && regularEventsForDay.map((event) => {
-                          const { top, height } = getEventPosition(event, dayDate);
-                          return (
-                            <DraggableEvent
-                              key={event.id}
-                              event={event}
-                              initialTop={top}
-                              height={Math.max(height, 40)}
-                              selectedDate={dayDate}
-                              onDragEnd={handleDragEnd}
-                              onResizeEnd={handleResizeEnd}
-                              onPress={handleEventPress}
-                            />
-                          );
-                        })}
+                        {(() => {
+                          if (regularEventsForDay.length === 0) return null;
+
+                          // Calculate layout for overlapping events
+                          const layoutMap = calculateEventLayout(regularEventsForDay);
+
+                          return regularEventsForDay.map((event) => {
+                            const { top, height } = getEventPosition(event, dayDate);
+                            const layout = layoutMap[event.id];
+                            const isPast = event.endTime.getTime() < Date.now();
+
+                            return (
+                              <DraggableEvent
+                                key={event.id}
+                                event={event}
+                                initialTop={top}
+                                height={Math.max(height, 40)}
+                                selectedDate={dayDate}
+                                left={layout?.left}
+                                width={layout?.width}
+                                isPast={isPast}
+                                onDragEnd={handleDragEnd}
+                                onResizeEnd={handleResizeEnd}
+                                onPress={handleEventPress}
+                              />
+                            );
+                          });
+                        })()}
                       </>
                     );
                   })()}
-                </View>
+                </Pressable>
               </View>
             </ScrollView>
           );
         })}
       </ScrollView>
-    </View>
+    </View >
   );
 }
 
@@ -1064,3 +1161,81 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+// Helper function to calculate layout for overlapping events
+function calculateEventLayout(events: FamilyEvent[]) {
+  // Sort events by start time, then by end time (longer first)
+  const sortedEvents = [...events].sort((a, b) => {
+    if (a.startTime.getTime() !== b.startTime.getTime()) {
+      return a.startTime.getTime() - b.startTime.getTime();
+    }
+    return b.endTime.getTime() - a.endTime.getTime();
+  });
+
+  const layout: { [id: string]: { left: string; width: string } } = {};
+
+  // Group intersecting events into clusters
+  const clusters: FamilyEvent[][] = [];
+  let currentCluster: FamilyEvent[] = [];
+  let clusterEnd = -1;
+
+  sortedEvents.forEach(event => {
+    if (currentCluster.length === 0) {
+      currentCluster.push(event);
+      clusterEnd = event.endTime.getTime();
+    } else {
+      // If event starts before current cluster ends, it belongs to the cluster
+      if (event.startTime.getTime() < clusterEnd) {
+        currentCluster.push(event);
+        clusterEnd = Math.max(clusterEnd, event.endTime.getTime());
+      } else {
+        // Start new cluster
+        clusters.push(currentCluster);
+        currentCluster = [event];
+        clusterEnd = event.endTime.getTime();
+      }
+    }
+  });
+  if (currentCluster.length > 0) clusters.push(currentCluster);
+
+  // Layout each cluster
+  clusters.forEach(cluster => {
+    // Simple column packing algorithm
+    const columns: FamilyEvent[][] = [];
+
+    cluster.forEach(event => {
+      let placed = false;
+      // Try to place in existing columns
+      for (let i = 0; i < columns.length; i++) {
+        const lastInCol = columns[i][columns[i].length - 1];
+        if (lastInCol.endTime.getTime() <= event.startTime.getTime()) {
+          columns[i].push(event);
+          // Store column index temporarily in 'left'
+          layout[event.id] = { left: `${i}`, width: '' };
+          placed = true;
+          break;
+        }
+      }
+      // If couldn't place, create new column
+      if (!placed) {
+        columns.push([event]);
+        layout[event.id] = { left: `${columns.length - 1}`, width: '' };
+      }
+    });
+
+    const totalCols = columns.length;
+
+    // Calculate final positions as percentages
+    cluster.forEach(event => {
+      if (layout[event.id]) {
+        const colIdx = parseInt(layout[event.id].left, 10);
+        layout[event.id] = {
+          left: `${(colIdx / totalCols) * 100}%`,
+          width: `${(1 / totalCols) * 100}%`
+        };
+      }
+    });
+  });
+
+  return layout;
+}
